@@ -234,7 +234,7 @@ Each phase is one or two AI sessions. **Done when** describes the acceptance che
 4. Never hand-edit generated output to make a test pass. Fix the feature module instead.
 
 ### Progress
-- [ ] Phase 0 — Repo bootstrap
+- [x] Phase 0 — Repo bootstrap
 - [ ] Phase 1 — Core engine
 - [ ] Phase 2 — Minimal working generator
 - [ ] Phase 3 — Production essentials (Docker, PM2)
