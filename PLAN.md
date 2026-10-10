@@ -235,7 +235,7 @@ Each phase is one or two AI sessions. **Done when** describes the acceptance che
 
 ### Progress
 - [x] Phase 0 — Repo bootstrap
-- [ ] Phase 1 — Core engine
+- [x] Phase 1 — Core engine
 - [ ] Phase 2 — Minimal working generator
 - [ ] Phase 3 — Production essentials (Docker, PM2)
 - [ ] Phase 4 — Databases
