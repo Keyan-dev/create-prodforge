@@ -237,7 +237,7 @@ Each phase is one or two AI sessions. **Done when** describes the acceptance che
 - [x] Phase 0 — Repo bootstrap
 - [x] Phase 1 — Core engine
 - [x] Phase 2 — Minimal working generator
-- [ ] Phase 3 — Production essentials (Docker, PM2)
+- [x] Phase 3 — Production essentials (Docker, PM2)
 - [ ] Phase 4 — Databases
 - [ ] Phase 5 — More frameworks and options
 - [ ] Phase 6 — Advanced options
