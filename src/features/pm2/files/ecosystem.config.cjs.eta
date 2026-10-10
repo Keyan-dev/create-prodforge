@@ -1,0 +1,24 @@
+// PM2 process file. On the server: npm install --global pm2@<%= it.pm2Version %>
+// Build first, then: pm2 start ecosystem.config.cjs
+// Log rotation: pm2 install pm2-logrotate
+module.exports = {
+  apps: [
+    {
+      name: '<%= it.cfg.name %>',
+      script: 'dist/server.js',
+      node_args: '--env-file-if-exists=.env',
+      // One worker per CPU, sharing the port.
+      exec_mode: 'cluster',
+      instances: 'max',
+      // Each worker calls process.send('ready') once it's listening.
+      wait_ready: true,
+      listen_timeout: 10_000,
+      // Longer than SHUTDOWN_TIMEOUT_MS so open requests can finish.
+      kill_timeout: 15_000,
+      max_memory_restart: '512M',
+      env: {
+        NODE_ENV: 'production',
+      },
+    },
+  ],
+};

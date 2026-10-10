@@ -1,9 +1,15 @@
 /**
  * Named injection slots. A base template marks a spot with a comment line such as
- * `// @slot:middleware` (or `# @slot:services` in YAML). Features push code into the slot by
- * name, so a feature never needs to know which framework file it is editing.
+ * `// @slot:middleware`, `# @slot:services` (YAML, Dockerfile) or `<!-- @slot:docs -->`
+ * (Markdown). Features push code into the slot by name, so a feature never needs to know which
+ * framework file it is editing.
  */
-const SLOT_LINE = /^([ \t]*)(?:\/\/|#)[ \t]*@slot:([\w-]+)[ \t]*$/;
+const SLOT_LINE =
+  /^([ \t]*)(?:(?:\/\/|#)[ \t]*@slot:([\w-]+)|<!--[ \t]*@slot:([\w-]+)[ \t]*-->)[ \t]*$/;
+
+function slotName(match: RegExpExecArray): string | undefined {
+  return match[2] ?? match[3];
+}
 
 export interface Injection {
   path: string;
@@ -14,7 +20,8 @@ export interface Injection {
 /** Names of every slot marker in `content`, in order. */
 export function findSlots(content: string): string[] {
   return content.split('\n').flatMap((line) => {
-    const slot = SLOT_LINE.exec(line)?.[2];
+    const match = SLOT_LINE.exec(line);
+    const slot = match && slotName(match);
     return slot ? [slot] : [];
   });
 }
@@ -39,7 +46,8 @@ export function applySlots(path: string, content: string, injections: Injection[
     .flatMap((line) => {
       const match = SLOT_LINE.exec(line);
       if (!match) return [line];
-      const [, indent = '', slot] = match;
+      const indent = match[1] ?? '';
+      const slot = slotName(match);
       return injections
         .filter((injection) => injection.slot === slot)
         .flatMap(({ code }) =>

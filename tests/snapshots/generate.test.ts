@@ -25,6 +25,24 @@ describe('generated project', () => {
     expect(result.files['tsdown.config.ts']).toContain("target: 'node22'");
   });
 
+  it('without docker and pm2', async () => {
+    const { files } = await snapshot({ name: 'my-api', docker: false, pm2: false });
+    expect(Object.keys(files)).not.toContain('Dockerfile');
+    expect(Object.keys(files)).not.toContain('ecosystem.config.cjs');
+    expect(files['README.md']).not.toMatch(/## Docker|## PM2/);
+  });
+
+  it('npm Dockerfile', async () => {
+    const { files } = await snapshot({ name: 'my-api', packageManager: 'npm' });
+    expect(files['Dockerfile']).toMatchSnapshot();
+  });
+
+  it('yarn gets no Dockerfile yet', async () => {
+    const { files } = await snapshot({ name: 'my-api', packageManager: 'yarn' });
+    expect(Object.keys(files)).not.toContain('Dockerfile');
+    expect(files['package.json']).not.toContain('packageManager');
+  });
+
   it('leaves no slot markers behind', async () => {
     const { files } = await snapshot({ name: 'my-api' });
     for (const [path, content] of Object.entries(files)) {

@@ -1,4 +1,5 @@
 import type { ProjectConfig } from '../core/config';
+import { dockerSupports } from '../features/docker';
 
 /**
  * Options the config schema accepts but no feature implements yet. This list shrinks as each
@@ -17,8 +18,7 @@ export function unavailable(cfg: ProjectConfig): { blocking: string[]; skipped: 
     cfg.auth !== 'none' && `auth (${cfg.auth})`,
     cfg.openapi && 'OpenAPI',
     cfg.otel && 'OpenTelemetry',
-    cfg.docker && 'Docker',
-    cfg.pm2 && 'PM2',
+    cfg.docker && !dockerSupports(cfg.packageManager) && `Docker (with ${cfg.packageManager})`,
     cfg.ci && 'CI workflow',
     cfg.gitHooks && 'git hooks',
   ].filter((item): item is string => Boolean(item));

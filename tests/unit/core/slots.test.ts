@@ -16,6 +16,7 @@ describe('slots', () => {
   it('finds slot markers', () => {
     expect(findSlots(app)).toEqual(['imports', 'middleware']);
     expect(findSlots('services:\n  # @slot:services\n')).toEqual(['services']);
+    expect(findSlots('# Title\n<!-- @slot:docs -->\n')).toEqual(['docs']);
   });
 
   it('injects code at the marker, matching its indentation, in injection order', () => {

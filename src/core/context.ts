@@ -65,18 +65,22 @@ export class FeatureFiles {
     this.vfs.write(path, content, options);
   }
 
-  /** Render an eta template string with `{ cfg }` and write the result. */
-  render(path: string, template: string): void {
-    this.vfs.write(path, render(template, { cfg: this.cfg }));
+  /** Render an eta template string with `{ cfg, ...data }` and write the result. */
+  render(path: string, template: string, data: Record<string, unknown> = {}): void {
+    this.vfs.write(path, render(template, { ...data, cfg: this.cfg }));
   }
 
   /**
    * Copy a template directory from disk into the project. Files ending in `.eta` are rendered
    * and lose the suffix; everything else is copied verbatim. A path segment starting with a
    * single `_` becomes a dotfile (`_gitignore` → `.gitignore`), because npm drops some dotfiles
-   * such as `.gitignore` from published packages.
+   * such as `.gitignore` from published packages. `data` is passed to templates next to `cfg`.
    */
-  async copyDir(sourceDir: string, destDir = '.'): Promise<void> {
+  async copyDir(
+    sourceDir: string,
+    destDir = '.',
+    data: Record<string, unknown> = {},
+  ): Promise<void> {
     const entries = await readdir(sourceDir, { recursive: true, withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isFile()) continue;
@@ -89,7 +93,7 @@ export class FeatureFiles {
       const content = await readFile(source, 'utf8');
       const dest = destDir === '.' ? rel : `${destDir}/${rel}`;
       if (rel.endsWith(TEMPLATE_SUFFIX)) {
-        this.render(dest.slice(0, -TEMPLATE_SUFFIX.length), content);
+        this.render(dest.slice(0, -TEMPLATE_SUFFIX.length), content, data);
       } else {
         this.write(dest, content);
       }
