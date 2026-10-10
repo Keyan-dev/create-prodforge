@@ -50,3 +50,16 @@ These pick the ★ defaults that `--yes` and `--preset api` use. PLAN.md §2 alr
 | Docker / PM2 / CI | Docker only | all on | all on |
 | Git hooks | off | on | on |
 | Redis/BullMQ, Auth, OTel | off | off | Redis + BullMQ, Better Auth, OTel |
+
+## 2026-10-10 · Phase 1 core engine
+
+- **`versions.ts` holds exact versions; the generated `package.json` gets caret ranges.** Exact pins keep the e2e matrix meaningful (we test what's in the file), and `^` lets users pick up patches after generation. Renovate reads the file through a regex custom manager in `renovate.json`, so entries must stay one `'name': 'x.y.z',` per line. Prettier's `quoteProps: "consistent"` keeps every key quoted so the regex matches.
+- **`dependsOn` is ordering only.** A feature runs after the listed features *if they're enabled*; a disabled one is skipped, not an error. An id no registered feature has *is* an error, to catch typos. Ties keep registry order so output is deterministic.
+- **`conflictsWith` is checked in both directions** among enabled features, so only one side needs to declare it.
+- **Features get an optional `finalize()` hook** that runs after every `apply()`. It lets a feature consume what others registered (the docker feature reading compose services, for example) without having to `dependsOn` every feature that might add one.
+- **Slot injections are queued and applied after all features run**, so the file can be written by a feature that runs later. Code is indented to the marker, multiple injections keep their order, and every marker line is removed at the end, including unfilled ones. Injecting into a missing slot or file throws with the available slot names.
+- **Conflicts throw instead of last-write-wins.** Two features adding the same dependency, script or env var with different values is a bug in one of them, so the pipeline stops and names both values.
+- **A package in both `dependencies` and `devDependencies` stays only in `dependencies`.**
+- **eta renders with `autoEscape: false`** (we generate code, not HTML) and trims the newline after a tag, so `<% if %>` blocks don't leave blank lines.
+- **Install and `git init` aren't in the pipeline yet.** Phase 1 stops at `writeProject()`; Phase 2 adds them along with the CLI wiring. How the bundled CLI finds each feature's `files/` directory after tsdown bundling is also left to Phase 2, when the first real feature exists.
+- **`ProjectConfig.example` defaults from `db`** (on with a database, off without), matching the default-stack decision above.
