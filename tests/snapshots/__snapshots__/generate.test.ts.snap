@@ -7,8 +7,21 @@ exports[`generated project > --yes defaults (express, vitest, eslint, pnpm, node
     "framework-express",
     "testing-vitest",
     "lint-eslint",
+    "docker",
+    "pm2",
   ],
   "files": {
+    ".dockerignore": "node_modules
+dist
+coverage
+.env
+.env.*
+!.env.example
+.git
+*.log
+Dockerfile
+compose.yaml
+",
     ".editorconfig": "root = true
 
 [*]
@@ -22,8 +35,26 @@ trim_trailing_whitespace = true
 [*.md]
 trim_trailing_whitespace = false
 ",
-    ".env.example": "# Port the HTTP server listens on
+    ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
 PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted JSON request body
+BODY_LIMIT=100kb
 ",
     ".gitignore": "node_modules/
 dist/
@@ -42,6 +73,41 @@ pnpm-lock.yaml
   "singleQuote": true,
   "printWidth": 100
 }
+",
+    "Dockerfile": "# syntax=docker/dockerfile:1
+
+ARG NODE_VERSION=24
+
+FROM node:\${NODE_VERSION}-alpine AS base
+WORKDIR /app
+RUN npm install --global pnpm@10.28.0
+
+# All dependencies, for building.
+FROM base AS deps
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS build
+COPY . .
+RUN pnpm build
+
+# Production dependencies only, for the final image.
+FROM base AS prod-deps
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
+
+FROM node:\${NODE_VERSION}-alpine AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --chown=node:node package.json ./
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \\
+  CMD wget -qO- "http://127.0.0.1:\${PORT:-3000}/health" || exit 1
+# Run node directly (not via a package manager) so it receives SIGTERM for graceful shutdown.
+CMD ["node", "dist/server.js"]
 ",
     "README.md": "# my-api
 
@@ -65,6 +131,70 @@ The server starts on \`http://localhost:3000\`. Check it with \`curl localhost:3
 - \`pnpm lint\`: lint with ESLint
 - \`pnpm format\`: format with Prettier
 - \`pnpm typecheck\`: type-check without emitting
+
+## Configuration
+
+Settings come from environment variables, validated at startup in \`src/config/env.ts\`. See \`.env.example\` for the full list. In development they are read from \`.env\`.
+
+## Endpoints
+
+- \`GET /health\`: the process is up (liveness)
+- \`GET /ready\`: dependencies are reachable and the server isn't shutting down (readiness)
+
+## Docker
+
+\`\`\`bash
+docker compose up --build
+\`\`\`
+
+The image is a multi-stage build on \`node:alpine\` that runs as the non-root \`node\` user, with a \`HEALTHCHECK\` on \`/health\`. Commit your lockfile first: the build installs from it.
+
+## PM2
+
+For a VM or bare-metal server. Build, then start one worker per CPU in cluster mode:
+
+\`\`\`bash
+npm install --global pm2@7.0.4
+pm2 start ecosystem.config.cjs
+\`\`\`
+",
+    "compose.yaml": "services:
+  app:
+    build: .
+    ports:
+      - \${PORT:-3000}:3000
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+    restart: unless-stopped
+",
+    "ecosystem.config.cjs": "// PM2 process file. On the server: npm install --global pm2@7.0.4
+// Build first, then: pm2 start ecosystem.config.cjs
+// Log rotation: pm2 install pm2-logrotate
+module.exports = {
+  apps: [
+    {
+      name: 'my-api',
+      script: 'dist/server.js',
+      node_args: '--env-file-if-exists=.env',
+      // One worker per CPU, sharing the port.
+      exec_mode: 'cluster',
+      instances: 'max',
+      // Each worker calls process.send('ready') once it's listening.
+      wait_ready: true,
+      listen_timeout: 10_000,
+      // Longer than SHUTDOWN_TIMEOUT_MS so open requests can finish.
+      kill_timeout: 15_000,
+      max_memory_restart: '512M',
+      env: {
+        NODE_ENV: 'production',
+      },
+    },
+  ],
+};
 ",
     "eslint.config.js": "// @ts-check
 import js from '@eslint/js';
@@ -77,6 +207,15 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   { languageOptions: { globals: globals.node } },
+  {
+    rules: {
+      // Prefix an unused parameter with _ to keep a required signature, e.g. Express (err, req, res, _next).
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+    },
+  },
   prettier,
 );
 ",
@@ -88,6 +227,7 @@ export default tseslint.config(
   "engines": {
     "node": ">=24"
   },
+  "packageManager": "pnpm@10.28.0",
   "scripts": {
     "build": "tsdown",
     "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
@@ -101,10 +241,17 @@ export default tseslint.config(
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "express": "^5.3.0"
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
     "@types/supertest": "^7.2.1",
@@ -112,6 +259,7 @@ export default tseslint.config(
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
+    "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
     "supertest": "^7.3.1",
     "tsdown": "^0.23.1",
@@ -127,40 +275,281 @@ export default tseslint.config(
   }
 }
 ",
-    "src/app.ts": "import express from 'express';
+    "src/app.ts": "import { randomUUID } from 'node:crypto';
+import cors from 'cors';
+import express from 'express';
+import { rateLimit } from 'express-rate-limit';
+import helmet from 'helmet';
+import { pinoHttp } from 'pino-http';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { healthRouter } from './modules/health/health.routes';
 
 /** Build the app without listening, so tests can drive it directly. */
 export function createApp() {
   const app = express();
-  app.use(express.json({ limit: '100kb' }));
 
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok' });
-  });
+  app.use(
+    pinoHttp({
+      logger,
+      // Reuse an incoming X-Request-Id (from a proxy) or create one, and echo it back.
+      genReqId: (req, res) => {
+        const id = req.headers['x-request-id']?.toString() || randomUUID();
+        res.setHeader('x-request-id', id);
+        return id;
+      },
+      autoLogging: { ignore: (req) => req.url === '/health' || req.url === '/ready' },
+    }),
+  );
+  app.use(helmet());
+  // Health checks stay outside CORS and rate limiting.
+  app.use(healthRouter);
+
+  app.use(cors({ origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') }));
+  app.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: env.RATE_LIMIT_PER_MINUTE,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+    }),
+  );
+  app.use(express.json({ limit: env.BODY_LIMIT }));
+
+  app.use(notFound);
+  app.use(errorHandler);
 
   return app;
 }
 ",
-    "src/server.ts": "import { createApp } from './app';
+    "src/config/env.ts": "import { z } from 'zod';
 
-const port = Number(process.env.PORT ?? 3000);
-
-const server = createApp().listen(port, () => {
-  console.log(\`Listening on http://localhost:\${port}\`);
+/** Every environment variable the app reads, validated once at startup. */
+const EnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  CORS_ORIGIN: z.string().default('*'),
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
+  BODY_LIMIT: z.string().default('100kb'),
 });
 
-export { server };
+const parsed = EnvSchema.safeParse(process.env);
+if (!parsed.success) {
+  console.error(\`Invalid environment variables:\\n\${z.prettifyError(parsed.error)}\`);
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export type Env = typeof env;
+",
+    "src/lib/logger.ts": "import { pino } from 'pino';
+import { env } from '../config/env';
+
+const defaultLevel = { development: 'debug', test: 'silent', production: 'info' } as const;
+
+/** Pretty output in development, JSON lines everywhere else. */
+export const logger = pino({
+  level: env.LOG_LEVEL ?? defaultLevel[env.NODE_ENV],
+  redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+  ...(env.NODE_ENV === 'development' && { transport: { target: 'pino-pretty' } }),
+});
+",
+    "src/lib/readiness.ts": "/** A dependency the app needs before it can serve traffic (database, cache, …). */
+export interface ReadinessCheck {
+  name: string;
+  check: () => Promise<void>;
+}
+
+const checks: ReadinessCheck[] = [];
+
+let shuttingDown = false;
+
+/** Called on SIGTERM so load balancers stop sending traffic before the server closes. */
+export function markShuttingDown() {
+  shuttingDown = true;
+}
+
+/** Run every check. \`ready\` is false while shutting down or if any check fails. */
+export async function readiness() {
+  if (shuttingDown) return { ready: false, checks: { shutdown: 'shutting down' } };
+
+  const results = await Promise.allSettled(checks.map(({ check }) => check()));
+  const report = Object.fromEntries(
+    checks.map(({ name }, index) => [
+      name,
+      results[index]?.status === 'fulfilled' ? 'ok' : 'failing',
+    ]),
+  );
+  return { ready: Object.values(report).every((status) => status === 'ok'), checks: report };
+}
+",
+    "src/middleware/error-handler.ts": "import type { ErrorRequestHandler, RequestHandler } from 'express';
+import { z } from 'zod';
+
+/** Throw this from a handler to send a specific status and message. */
+export class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = 'HttpError';
+  }
+}
+
+export const notFound: RequestHandler = (req, _res, next) => {
+  next(new HttpError(404, \`Cannot \${req.method} \${req.path}\`));
+};
+
+/** Errors that come from body parsing etc. carry a safe-to-show status and message. */
+function isExposedError(error: unknown): error is { status: number; message: string } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof error.status === 'number' &&
+    'expose' in error &&
+    error.expose === true
+  );
+}
+
+/** One JSON error shape for everything. 5xx details are logged, never sent to the client. */
+export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
+  let status = 500;
+  let message = 'Internal Server Error';
+  let details: unknown;
+
+  if (error instanceof HttpError) {
+    ({ status, message, details } = error);
+  } else if (error instanceof z.ZodError) {
+    status = 400;
+    message = 'Validation failed';
+    details = z.flattenError(error);
+  } else if (isExposedError(error)) {
+    ({ status, message } = error);
+  }
+
+  if (status >= 500) req.log.error({ err: error }, 'Request failed');
+
+  res.status(status).json({ error: { message, details, requestId: req.id } });
+};
+",
+    "src/modules/health/health.routes.ts": "import { Router } from 'express';
+import { readiness } from '../../lib/readiness';
+
+export const healthRouter = Router();
+
+/** Liveness: the process is up. Used by the Docker HEALTHCHECK. */
+healthRouter.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
+/** Readiness: dependencies are reachable and the app isn't shutting down. */
+healthRouter.get('/ready', async (_req, res) => {
+  const result = await readiness();
+  res.status(result.ready ? 200 : 503).json(result);
+});
+",
+    "src/server.ts": "import { createApp } from './app';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { markShuttingDown } from './lib/readiness';
+
+const server = createApp().listen(env.PORT, () => {
+  logger.info(\`Listening on http://localhost:\${env.PORT}\`);
+  // Tells PM2 (wait_ready) that this worker can take traffic.
+  process.send?.('ready');
+});
+
+let shuttingDown = false;
+
+/** Stop taking new connections, let open requests finish, close resources, then exit. */
+function shutdown(reason: string, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Shutting down');
+  markShuttingDown();
+
+  const timer = setTimeout(() => {
+    logger.error('Open connections did not close in time, exiting');
+    process.exit(1);
+  }, env.SHUTDOWN_TIMEOUT_MS);
+  timer.unref();
+
+  server.close(async (error) => {
+    if (error) logger.error({ err: error }, 'Error while closing the server');
+    process.exit(error ? 1 : exitCode);
+  });
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  shutdown('unhandledRejection', 1);
+});
+process.on('uncaughtException', (error) => {
+  logger.fatal({ err: error }, 'Uncaught exception');
+  shutdown('uncaughtException', 1);
+});
+",
+    "tests/app.test.ts": "import request from 'supertest';
+import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+describe('app', () => {
+  it('returns a JSON 404 with the request id', async () => {
+    const response = await request(createApp()).get('/nope');
+
+    expect(response.status).toBe(404);
+    expect(response.body.error).toMatchObject({ message: 'Cannot GET /nope' });
+    expect(response.body.error.requestId).toBe(response.headers['x-request-id']);
+  });
+
+  it('reuses an incoming X-Request-Id', async () => {
+    const response = await request(createApp()).get('/health').set('x-request-id', 'abc-123');
+
+    expect(response.headers['x-request-id']).toBe('abc-123');
+  });
+
+  it('rejects malformed JSON with a 400', async () => {
+    const response = await request(createApp())
+      .post('/anything')
+      .set('content-type', 'application/json')
+      .send('{"oops"');
+
+    expect(response.status).toBe(400);
+  });
+
+  it('sets security headers', async () => {
+    const response = await request(createApp()).get('/health');
+
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['x-powered-by']).toBeUndefined();
+  });
+});
 ",
     "tests/health.test.ts": "import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 
-describe('GET /health', () => {
-  it('responds with ok', async () => {
+describe('health', () => {
+  it('GET /health responds with ok', async () => {
     const response = await request(createApp()).get('/health');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: 'ok' });
+  });
+
+  it('GET /ready reports each check', async () => {
+    const response = await request(createApp()).get('/ready');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ ready: true });
   });
 });
 ",
@@ -207,6 +596,43 @@ export default defineConfig({
 }
 `;
 
+exports[`generated project > npm Dockerfile 1`] = `
+"# syntax=docker/dockerfile:1
+
+ARG NODE_VERSION=24
+
+FROM node:\${NODE_VERSION}-alpine AS base
+WORKDIR /app
+
+# All dependencies, for building.
+FROM base AS deps
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM deps AS build
+COPY . .
+RUN npm run build
+
+# Production dependencies only, for the final image.
+FROM base AS prod-deps
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+FROM node:\${NODE_VERSION}-alpine AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --chown=node:node package.json ./
+USER node
+EXPOSE 3000
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \\
+  CMD wget -qO- "http://127.0.0.1:\${PORT:-3000}/health" || exit 1
+# Run node directly (not via a package manager) so it receives SIGTERM for graceful shutdown.
+CMD ["node", "dist/server.js"]
+"
+`;
+
 exports[`generated project > npm on node 22 1`] = `
 "{
   "name": "my-api",
@@ -229,10 +655,17 @@ exports[`generated project > npm on node 22 1`] = `
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "express": "^5.3.0"
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
     "@types/supertest": "^7.2.1",
@@ -240,6 +673,7 @@ exports[`generated project > npm on node 22 1`] = `
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
+    "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
     "supertest": "^7.3.1",
     "tsdown": "^0.23.1",
@@ -275,5 +709,31 @@ The server starts on \`http://localhost:3000\`. Check it with \`curl localhost:3
 - \`npm run lint\`: lint with ESLint
 - \`npm run format\`: format with Prettier
 - \`npm run typecheck\`: type-check without emitting
+
+## Configuration
+
+Settings come from environment variables, validated at startup in \`src/config/env.ts\`. See \`.env.example\` for the full list. In development they are read from \`.env\`.
+
+## Endpoints
+
+- \`GET /health\`: the process is up (liveness)
+- \`GET /ready\`: dependencies are reachable and the server isn't shutting down (readiness)
+
+## Docker
+
+\`\`\`bash
+docker compose up --build
+\`\`\`
+
+The image is a multi-stage build on \`node:alpine\` that runs as the non-root \`node\` user, with a \`HEALTHCHECK\` on \`/health\`. Commit your lockfile first: the build installs from it.
+
+## PM2
+
+For a VM or bare-metal server. Build, then start one worker per CPU in cluster mode:
+
+\`\`\`bash
+npm install --global pm2@7.0.4
+pm2 start ecosystem.config.cjs
+\`\`\`
 "
 `;

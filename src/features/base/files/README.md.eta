@@ -21,3 +21,13 @@ The server starts on `http://localhost:3000`. Check it with `curl localhost:3000
 - `<%= run %> lint`: lint with ESLint
 - `<%= run %> format`: format with Prettier
 - `<%= run %> typecheck`: type-check without emitting
+
+## Configuration
+
+Settings come from environment variables, validated at startup in `src/config/env.ts`. See `.env.example` for the full list. In development they are read from `.env`.
+
+## Endpoints
+
+- `GET /health`: the process is up (liveness)
+- `GET /ready`: dependencies are reachable and the server isn't shutting down (readiness)
+<!-- @slot:docs -->
