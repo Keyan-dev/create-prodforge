@@ -7,3 +7,11 @@ npm create prodforge@latest my-api
 ```
 
 > 🚧 Work in progress. See [PLAN.md](./PLAN.md).
+
+## License
+
+MIT
+
+## License
+
+MIT

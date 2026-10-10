@@ -1,0 +1,27 @@
+name: Bug report
+description: Something in the CLI or the project it generated doesn't work
+labels: [bug]
+body:
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran
+      placeholder: npm create prodforge@latest my-api --framework fastify --db prisma
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened vs. what you expected
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: create-prodforge 0.1.0, Node 24.x, pnpm 10.x, macOS
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      render: shell

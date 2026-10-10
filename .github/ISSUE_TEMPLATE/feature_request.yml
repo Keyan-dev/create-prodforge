@@ -1,0 +1,15 @@
+name: Feature request
+description: Suggest a new option, framework, or integration
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to generate?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed CLI flag / prompt
+      placeholder: --queue bullmq
