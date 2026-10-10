@@ -1,0 +1,279 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generated project > --yes defaults (express, vitest, eslint, pnpm, node 24) 1`] = `
+{
+  "features": [
+    "base",
+    "framework-express",
+    "testing-vitest",
+    "lint-eslint",
+  ],
+  "files": {
+    ".editorconfig": "root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+",
+    ".env.example": "# Port the HTTP server listens on
+PORT=3000
+",
+    ".gitignore": "node_modules/
+dist/
+coverage/
+.env
+*.log
+.DS_Store
+",
+    ".nvmrc": "24
+",
+    ".prettierignore": "dist/
+coverage/
+pnpm-lock.yaml
+",
+    ".prettierrc.json": "{
+  "singleQuote": true,
+  "printWidth": 100
+}
+",
+    "README.md": "# my-api
+
+Generated with [create-prodforge](https://github.com/Keyan-dev/create-prodforge).
+
+## Getting started
+
+\`\`\`bash
+cp .env.example .env
+pnpm dev
+\`\`\`
+
+The server starts on \`http://localhost:3000\`. Check it with \`curl localhost:3000/health\`.
+
+## Scripts
+
+- \`pnpm dev\`: start the server and restart on changes
+- \`pnpm build\`: bundle to \`dist/\` with tsdown
+- \`pnpm start\`: run the built server
+- \`pnpm test\`: run the tests once
+- \`pnpm lint\`: lint with ESLint
+- \`pnpm format\`: format with Prettier
+- \`pnpm typecheck\`: type-check without emitting
+",
+    "eslint.config.js": "// @ts-check
+import js from '@eslint/js';
+import prettier from 'eslint-config-prettier';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  { ignores: ['dist/', 'coverage/'] },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  { languageOptions: { globals: globals.node } },
+  prettier,
+);
+",
+    "package.json": "{
+  "name": "my-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.3.1",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
+",
+    "src/app.ts": "import express from 'express';
+
+/** Build the app without listening, so tests can drive it directly. */
+export function createApp() {
+  const app = express();
+  app.use(express.json({ limit: '100kb' }));
+
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok' });
+  });
+
+  return app;
+}
+",
+    "src/server.ts": "import { createApp } from './app';
+
+const port = Number(process.env.PORT ?? 3000);
+
+const server = createApp().listen(port, () => {
+  console.log(\`Listening on http://localhost:\${port}\`);
+});
+
+export { server };
+",
+    "tests/health.test.ts": "import request from 'supertest';
+import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+describe('GET /health', () => {
+  it('responds with ok', async () => {
+    const response = await request(createApp()).get('/health');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ status: 'ok' });
+  });
+});
+",
+    "tsconfig.json": "{
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src", "tests", "*.config.ts"]
+}
+",
+    "tsdown.config.ts": "import { defineConfig } from 'tsdown';
+
+export default defineConfig({
+  entry: ['src/server.ts'],
+  format: 'esm',
+  platform: 'node',
+  target: 'node24',
+  fixedExtension: false,
+  clean: true,
+});
+",
+    "vitest.config.ts": "import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    include: ['tests/**/*.test.ts'],
+    coverage: { provider: 'v8', include: ['src/**'] },
+  },
+});
+",
+  },
+}
+`;
+
+exports[`generated project > npm on node 22 1`] = `
+"{
+  "name": "my-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.3.1",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  }
+}
+"
+`;
+
+exports[`generated project > npm on node 22 2`] = `
+"# my-api
+
+Generated with [create-prodforge](https://github.com/Keyan-dev/create-prodforge).
+
+## Getting started
+
+\`\`\`bash
+cp .env.example .env
+npm run dev
+\`\`\`
+
+The server starts on \`http://localhost:3000\`. Check it with \`curl localhost:3000/health\`.
+
+## Scripts
+
+- \`npm run dev\`: start the server and restart on changes
+- \`npm run build\`: bundle to \`dist/\` with tsdown
+- \`npm run start\`: run the built server
+- \`npm run test\`: run the tests once
+- \`npm run lint\`: lint with ESLint
+- \`npm run format\`: format with Prettier
+- \`npm run typecheck\`: type-check without emitting
+"
+`;

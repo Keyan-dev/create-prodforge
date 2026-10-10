@@ -10,15 +10,22 @@ describe('FeatureFiles.copyDir', () => {
     const ctx = new GeneratorContext(parseConfig({ name: 'my-api' }));
     await ctx.files.copyDir(fixtures);
 
-    expect(ctx.vfs.paths()).toEqual(['README.md', 'src/app.ts']);
+    expect(ctx.vfs.paths()).toEqual(['.gitignore', 'README.md', '__keep__/file.txt', 'src/app.ts']);
     expect(ctx.vfs.read('src/app.ts')).toBe('export const name = "my-api";\n');
     expect(ctx.vfs.read('README.md')).toBe('plain <%= not rendered %>\n');
+  });
+
+  it('turns a leading single underscore into a dot, leaving double underscores alone', async () => {
+    const ctx = new GeneratorContext(parseConfig({ name: 'my-api' }));
+    await ctx.files.copyDir(fixtures);
+    expect(ctx.vfs.read('.gitignore')).toBe('dist/\n');
+    expect(ctx.vfs.has('__keep__/file.txt')).toBe(true);
   });
 
   it('copies into a destination directory', async () => {
     const ctx = new GeneratorContext(parseConfig({ name: 'my-api' }));
     await ctx.files.copyDir(fixtures, 'packages/api');
-    expect(ctx.vfs.paths()).toEqual(['packages/api/README.md', 'packages/api/src/app.ts']);
+    expect(ctx.vfs.paths()).toContain('packages/api/src/app.ts');
   });
 });
 

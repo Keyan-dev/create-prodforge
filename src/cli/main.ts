@@ -1,5 +1,10 @@
+import * as p from '@clack/prompts';
 import { defineCommand } from 'citty';
+import { z } from 'zod';
 import pkg from '../../package.json' with { type: 'json' };
+import { args } from './args';
+import { create } from './create';
+import { CancelledError } from './prompts';
 
 export const main = defineCommand({
   meta: {
@@ -7,7 +12,23 @@ export const main = defineCommand({
     version: pkg.version,
     description: pkg.description,
   },
-  run() {
-    console.log(`create-prodforge v${pkg.version}. Project generation arrives in Phase 2.`);
+  args,
+  async run({ args: parsed }) {
+    try {
+      await create(parsed, {
+        cwd: process.cwd(),
+        interactive: !parsed.yes && Boolean(process.stdin.isTTY),
+        force: Boolean(parsed.force),
+      });
+    } catch (error) {
+      if (error instanceof CancelledError) {
+        p.cancel('Cancelled.');
+      } else if (error instanceof z.ZodError) {
+        p.cancel(`Invalid options:\n${z.prettifyError(error)}`);
+      } else {
+        p.cancel(error instanceof Error ? error.message : String(error));
+      }
+      process.exitCode = 1;
+    }
   },
 });
