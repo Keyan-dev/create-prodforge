@@ -10,13 +10,24 @@ export const versions = {
   'express': '5.3.0',
   'helmet': '8.3.0',
   'zod': '4.6.5',
-  // tooling
+  // build and types
   '@types/express': '5.0.6',
   '@types/node': '24.19.2',
   'tsdown': '0.23.1',
   'tsx': '4.23.15',
   'typescript': '6.0.3',
+  // testing
+  '@types/supertest': '7.2.1',
+  'supertest': '7.3.1',
+  '@vitest/coverage-v8': '5.0.3',
   'vitest': '5.0.3',
+  // lint and format
+  '@eslint/js': '10.0.1',
+  'eslint': '10.12.0',
+  'eslint-config-prettier': '10.1.8',
+  'globals': '17.13.0',
+  'prettier': '3.9.10',
+  'typescript-eslint': '8.71.1',
 } as const;
 
 export type PackageName = keyof typeof versions;

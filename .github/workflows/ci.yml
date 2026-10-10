@@ -29,4 +29,24 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - name: Smoke test the built CLI
-        run: test "$(node dist/index.js --version)" = "$(node -p 'require("./package.json").version')"
+        run: |
+          test "$(node dist/index.js --version)" = "$(node -p 'require("./package.json").version')"
+          cd "$RUNNER_TEMP" && node "$GITHUB_WORKSPACE/dist/index.js" smoke-app --yes --no-install --no-git
+          test -f smoke-app/src/app.ts && test -f smoke-app/.gitignore
+
+  e2e:
+    # Generate → install → lint/test/build/run for real (PLAN.md §6).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Git identity for the generated project's initial commit
+        run: |
+          git config --global user.name "create-prodforge CI"
+          git config --global user.email "ci@users.noreply.github.com"
+      - run: pnpm test:e2e

@@ -1,3 +1,4 @@
+import { cp } from 'node:fs/promises';
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
@@ -8,6 +9,13 @@ export default defineConfig({
   dts: false,
   clean: true,
   fixedExtension: false,
-  // Bundle to a single file. citty stays external and is installed as a dependency.
+  // Bundle to a single file. Runtime dependencies stay external and are installed with the CLI.
   outDir: 'dist',
+  // Ship each feature's template directory next to the bundle (src/core/templates.ts finds them).
+  async onSuccess() {
+    await cp('src/features', 'dist/features', {
+      recursive: true,
+      filter: (source) => !/\.ts$/.test(source) || source.includes('/files/'),
+    });
+  },
 });

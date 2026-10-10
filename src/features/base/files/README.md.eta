@@ -1,0 +1,23 @@
+<% const run = it.cfg.packageManager === 'npm' ? 'npm run' : it.cfg.packageManager; -%>
+# <%= it.cfg.name %>
+
+Generated with [create-prodforge](https://github.com/Keyan-dev/create-prodforge).
+
+## Getting started
+
+```bash
+cp .env.example .env
+<%= run %> dev
+```
+
+The server starts on `http://localhost:3000`. Check it with `curl localhost:3000/health`.
+
+## Scripts
+
+- `<%= run %> dev`: start the server and restart on changes
+- `<%= run %> build`: bundle to `dist/` with tsdown
+- `<%= run %> start`: run the built server
+- `<%= run %> test`: run the tests once
+- `<%= run %> lint`: lint with ESLint
+- `<%= run %> format`: format with Prettier
+- `<%= run %> typecheck`: type-check without emitting

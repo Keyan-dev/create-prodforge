@@ -63,3 +63,16 @@ These pick the ★ defaults that `--yes` and `--preset api` use. PLAN.md §2 alr
 - **eta renders with `autoEscape: false`** (we generate code, not HTML) **and no automatic trimming.** Auto-trim also ate the newline after a `<%= %>` at the end of a line, merging it with the next one. Control-flow tags opt in with `-%>` (`<% if (it.cfg.docker) { -%>`) so they leave no blank line.
 - **Install and `git init` aren't in the pipeline yet.** Phase 1 stops at `writeProject()`; Phase 2 adds them along with the CLI wiring. How the bundled CLI finds each feature's `files/` directory after tsdown bundling is also left to Phase 2, when the first real feature exists.
 - **`ProjectConfig.example` defaults from `db`** (on with a database, off without), matching the default-stack decision above.
+
+## 2026-10-10 · Phase 2 minimal generator
+
+- **Options without a feature yet are reported, not silently dropped.** `--yes` uses the `api` preset from the default-stack decision, which includes Prisma, Docker, PM2 and more that later phases build. The CLI prints one "Not available yet, so not generated: …" line for those and generates the rest. A framework or linter with no feature yet (`--framework hono`) is an error instead, because there's no sensible project without it. `src/cli/availability.ts` holds the list and shrinks phase by phase.
+- **Prompts only ask what can be generated today:** project name, install, git. Framework, database and extras prompts arrive with their features, so nobody picks an option that does nothing.
+- **Templates ship next to the bundle.** The build copies `src/features/*/files/` to `dist/features/*/files/`, and `featureFiles(id)` looks in both places, so the same code works from source (`pnpm dev`, tests) and from the published CLI.
+- **`_name` in a template directory becomes `.name`.** npm drops `.gitignore` (and some other dotfiles) from published packages, so templates store `_gitignore`, `_prettierrc.json`, etc. Only a single leading underscore is converted, so `__tests__` stays as is.
+- **Generated projects use `module: preserve` + `moduleResolution: bundler`**, same as this repo. tsx (dev), Vitest (tests) and tsdown (build) all resolve extensionless imports, so `import { createApp } from './app'` works everywhere and `node dist/server.js` runs the bundle.
+- **`dev` and `start` load `.env` with Node's `--env-file-if-exists`.** No dotenv dependency. Typed env validation with Zod comes in Phase 3.
+- **pnpm projects allow esbuild's build script** (`pnpm.onlyBuiltDependencies`), which pnpm 10 blocks by default and tsx needs.
+- **The health check test lives in the framework feature**, not testing-vitest, because how a test drives the app (Supertest against an Express app vs. Fastify's `inject`) depends on the framework. testing-vitest owns the runner config and scripts.
+- **The e2e test runs the built CLI**, installs real dependencies, and checks lint, format, typecheck, test and build, then boots `pnpm start` and `pnpm dev` and calls `/health`. It runs as its own CI job; the main job also smoke-tests that the bundle ships its templates.
+- **Install failures stop the CLI with pnpm's output; a failed initial git commit doesn't.** The commit usually fails only because no git identity is configured, so the repository is left initialized with everything staged.

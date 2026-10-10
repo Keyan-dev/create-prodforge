@@ -1,10 +1,13 @@
 import { defineConfig } from 'vitest/config';
 
-// Slow generate → install → build matrix (PLAN.md §6). Populated from Phase 2 on.
+// Slow generate → install → build matrix (PLAN.md §6).
 export default defineConfig({
   test: {
     include: ['tests/e2e/**/*.test.ts'],
     passWithNoTests: true,
-    testTimeout: 300_000,
+    testTimeout: 120_000,
+    hookTimeout: 300_000,
+    // One generated project, checked step by step.
+    sequence: { concurrent: false },
   },
 });

@@ -50,6 +50,10 @@ export class ComposeRegistry {
   }
 }
 
+function toDotfile(segment: string): string {
+  return /^_[^_]/.test(segment) ? `.${segment.slice(1)}` : segment;
+}
+
 /** File helpers for features. Everything lands in the virtual FS. */
 export class FeatureFiles {
   constructor(
@@ -68,14 +72,20 @@ export class FeatureFiles {
 
   /**
    * Copy a template directory from disk into the project. Files ending in `.eta` are rendered
-   * and lose the suffix; everything else is copied verbatim.
+   * and lose the suffix; everything else is copied verbatim. A path segment starting with a
+   * single `_` becomes a dotfile (`_gitignore` → `.gitignore`), because npm drops some dotfiles
+   * such as `.gitignore` from published packages.
    */
   async copyDir(sourceDir: string, destDir = '.'): Promise<void> {
     const entries = await readdir(sourceDir, { recursive: true, withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isFile()) continue;
       const source = join(entry.parentPath, entry.name);
-      const rel = relative(sourceDir, source).replaceAll('\\', '/');
+      const rel = relative(sourceDir, source)
+        .replaceAll('\\', '/')
+        .split('/')
+        .map(toDotfile)
+        .join('/');
       const content = await readFile(source, 'utf8');
       const dest = destDir === '.' ? rel : `${destDir}/${rel}`;
       if (rel.endsWith(TEMPLATE_SUFFIX)) {
