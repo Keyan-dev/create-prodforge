@@ -11,7 +11,3 @@ npm create prodforge@latest my-api
 ## License
 
 MIT
-
-## License
-
-MIT
