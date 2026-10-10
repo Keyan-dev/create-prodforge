@@ -38,7 +38,8 @@
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "changeset": "changeset",
-    "release": "pnpm build && changeset publish"
+    "release": "pnpm build && changeset publish",
+    "try:engine": "tsx scripts/try-engine.ts"
   },
   "dependencies": {
     "citty": "^0.2.2",
