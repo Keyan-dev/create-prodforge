@@ -8,6 +8,7 @@
 export const versions = {
   // runtime
   'express': '5.3.0',
+  'helmet': '8.3.0',
   'zod': '4.6.5',
   // tooling
   '@types/express': '5.0.6',

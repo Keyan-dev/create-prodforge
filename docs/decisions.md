@@ -60,6 +60,6 @@ These pick the ★ defaults that `--yes` and `--preset api` use. PLAN.md §2 alr
 - **Slot injections are queued and applied after all features run**, so the file can be written by a feature that runs later. Code is indented to the marker, multiple injections keep their order, and every marker line is removed at the end, including unfilled ones. Injecting into a missing slot or file throws with the available slot names.
 - **Conflicts throw instead of last-write-wins.** Two features adding the same dependency, script or env var with different values is a bug in one of them, so the pipeline stops and names both values.
 - **A package in both `dependencies` and `devDependencies` stays only in `dependencies`.**
-- **eta renders with `autoEscape: false`** (we generate code, not HTML) and trims the newline after a tag, so `<% if %>` blocks don't leave blank lines.
+- **eta renders with `autoEscape: false`** (we generate code, not HTML) **and no automatic trimming.** Auto-trim also ate the newline after a `<%= %>` at the end of a line, merging it with the next one. Control-flow tags opt in with `-%>` (`<% if (it.cfg.docker) { -%>`) so they leave no blank line.
 - **Install and `git init` aren't in the pipeline yet.** Phase 1 stops at `writeProject()`; Phase 2 adds them along with the CLI wiring. How the bundled CLI finds each feature's `files/` directory after tsdown bundling is also left to Phase 2, when the first real feature exists.
 - **`ProjectConfig.example` defaults from `db`** (on with a database, off without), matching the default-stack decision above.
