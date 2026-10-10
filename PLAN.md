@@ -254,5 +254,5 @@ Each phase is one or two AI sessions. **Done when** describes the acceptance che
 
 ## 10. Open questions
 - Final package name (`create-prodforge` is available on npm as of 2026-10-10)
-- Should the generated project include an example CRUD module by default, or keep it opt-in?
-- Distroless vs alpine as the default Docker base image
+- ~~Should the generated project include an example CRUD module by default, or keep it opt-in?~~ Settled: on when a DB is selected (see `docs/decisions.md`).
+- ~~Distroless vs alpine as the default Docker base image~~ Settled: `node:24-alpine` (see `docs/decisions.md`).
