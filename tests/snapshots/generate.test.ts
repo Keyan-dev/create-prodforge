@@ -43,10 +43,47 @@ describe('generated project', () => {
     expect(files['package.json']).not.toContain('packageManager');
   });
 
-  it('leaves no slot markers behind', async () => {
-    const { files } = await snapshot({ name: 'my-api' });
-    for (const [path, content] of Object.entries(files)) {
-      expect(content, path).not.toMatch(/@slot:/);
-    }
+  // The files a database choice changes, so each snapshot stays reviewable.
+  const DB_FILES =
+    /^(package\.json|compose\.yaml|README\.md|\.env\.example|src\/(server|app)\.ts|src\/config\/env\.ts|src\/db\/|src\/modules\/users\/|drizzle|prisma|tests\/users)/;
+  const dbFiles = (files: Record<string, string>) =>
+    Object.fromEntries(Object.entries(files).filter(([path]) => DB_FILES.test(path)));
+
+  it.each(['drizzle', 'mongoose'] as const)('--db %s', async (db) => {
+    const { files, features: ran } = await snapshot({ name: 'my-api', db });
+    expect(ran).toContain(`db-${db}`);
+    expect(dbFiles(files)).toMatchSnapshot();
   });
+
+  it('--db none has no database or users module', async () => {
+    const { files } = await snapshot({ name: 'my-api', db: 'none' });
+    expect(Object.keys(files).filter((path) => /db|users|prisma/.test(path))).toEqual([]);
+    expect(files['compose.yaml']).toMatchSnapshot();
+    expect(files['src/server.ts']).toMatchSnapshot();
+  });
+
+  it('prisma without the example module', async () => {
+    const { files } = await snapshot({ name: 'my-api', example: false });
+    expect(files['prisma/schema.prisma']).not.toContain('model User');
+    expect(Object.keys(files).filter((path) => /users|migrations\/\d/.test(path))).toEqual([]);
+  });
+
+  it('drizzle without the example module', async () => {
+    const { files } = await snapshot({ name: 'my-api', db: 'drizzle', example: false });
+    expect(files['src/db/schema.ts']).toMatchSnapshot();
+    expect(Object.keys(files).filter((path) => /users|drizzle\//.test(path))).toEqual([
+      'drizzle/meta/_journal.json',
+    ]);
+    expect(files['drizzle/meta/_journal.json']).toContain('"entries": []');
+  });
+
+  it.each(['prisma', 'drizzle', 'mongoose', 'none'] as const)(
+    'leaves no slot markers behind (%s)',
+    async (db) => {
+      const { files } = await snapshot({ name: 'my-api', db });
+      for (const [path, content] of Object.entries(files)) {
+        expect(content, path).not.toMatch(/@slot:/);
+      }
+    },
+  );
 });

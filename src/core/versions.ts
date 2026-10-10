@@ -7,10 +7,15 @@
  */
 export const versions = {
   // runtime
+  '@prisma/adapter-pg': '7.10.0',
+  '@prisma/client': '7.10.0',
   'cors': '2.8.6',
+  'drizzle-orm': '0.45.4',
   'express': '5.3.0',
   'express-rate-limit': '8.7.1',
   'helmet': '8.3.0',
+  'mongoose': '9.11.1',
+  'pg': '8.23.1',
   'pino': '10.4.0',
   'pino-http': '11.0.0',
   'zod': '4.6.5',
@@ -18,9 +23,13 @@ export const versions = {
   '@types/cors': '2.8.19',
   '@types/express': '5.0.6',
   '@types/node': '24.19.2',
+  '@types/pg': '8.23.1',
   'tsdown': '0.23.1',
   'tsx': '4.23.15',
   'typescript': '6.0.3',
+  // database tooling
+  'drizzle-kit': '0.31.11',
+  'prisma': '7.10.0',
   // dev logging
   'pino-pretty': '13.2.0',
   // testing
@@ -38,6 +47,15 @@ export const versions = {
   // deploy tooling (installed on the host or in the image, not in package.json)
   'pm2': '7.0.4',
   'pnpm': '10.28.0',
+} as const;
+
+/**
+ * Docker images for compose services, as `image:tag`. Renovate updates them through a second
+ * custom manager; keys stay unquoted so the npm manager above doesn't pick these up.
+ */
+export const images = {
+  mongo: 'mongo:8',
+  postgres: 'postgres:18-alpine',
 } as const;
 
 export type PackageName = keyof typeof versions;

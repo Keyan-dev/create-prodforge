@@ -12,6 +12,13 @@
       "managerFilePatterns": ["/^src/core/versions\\.ts$/"],
       "matchStrings": ["'(?<depName>[^']+)': '(?<currentValue>[^']+)',"],
       "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "Docker images for compose services in generated projects",
+      "managerFilePatterns": ["/^src/core/versions\\.ts$/"],
+      "matchStrings": ["\\w+: '(?<depName>[a-z0-9./-]+):(?<currentValue>[^']+)',"],
+      "datasourceTemplate": "docker"
     }
   ]
 }

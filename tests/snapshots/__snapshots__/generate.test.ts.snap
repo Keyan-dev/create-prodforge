@@ -1,10 +1,1370 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`generated project > --db drizzle 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted JSON request body
+BODY_LIMIT=100kb
+
+# Database connection string
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+",
+  "README.md": "# my-api
+
+Generated with [create-prodforge](https://github.com/Keyan-dev/create-prodforge).
+
+## Getting started
+
+\`\`\`bash
+cp .env.example .env
+docker compose up -d postgres
+pnpm db:deploy
+pnpm dev
+\`\`\`
+
+The server starts on \`http://localhost:3000\`. Check it with \`curl localhost:3000/health\`.
+
+## Scripts
+
+- \`pnpm dev\`: start the server and restart on changes
+- \`pnpm build\`: bundle to \`dist/\` with tsdown
+- \`pnpm start\`: run the built server
+- \`pnpm test\`: run the tests once
+- \`pnpm lint\`: lint with ESLint
+- \`pnpm format\`: format with Prettier
+- \`pnpm typecheck\`: type-check without emitting
+
+## Configuration
+
+Settings come from environment variables, validated at startup in \`src/config/env.ts\`. See \`.env.example\` for the full list. In development they are read from \`.env\`.
+
+## Endpoints
+
+- \`GET /health\`: the process is up (liveness)
+- \`GET /ready\`: dependencies are reachable and the server isn't shutting down (readiness)
+
+## Database
+
+Drizzle ORM with PostgreSQL. Tables are defined in \`src/db/schema.ts\`. After changing it, run \`pnpm db:generate\` to write a SQL migration to \`drizzle/\`, then \`pnpm db:migrate\` to apply it. \`pnpm db:deploy\` does the same as \`db:migrate\`; deploys and the compose \`migrate\` service use it.
+
+## Example users module
+
+\`src/modules/users\` is a small CRUD API that shows the database wiring end to end:
+
+- \`GET /users?limit=20&offset=0\`: list users
+- \`POST /users\`: create one from \`{ "email", "name" }\`
+- \`GET /users/:id\`, \`PATCH /users/:id\`, \`DELETE /users/:id\`
+
+Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the \`usersRouter\` lines in \`src/app.ts\`.
+
+## Docker
+
+\`\`\`bash
+docker compose up --build
+\`\`\`
+
+The image is a multi-stage build on \`node:alpine\` that runs as the non-root \`node\` user, with a \`HEALTHCHECK\` on \`/health\`. Commit your lockfile first: the build installs from it.
+
+## PM2
+
+For a VM or bare-metal server. Build, then start one worker per CPU in cluster mode:
+
+\`\`\`bash
+npm install --global pm2@7.0.4
+pm2 start ecosystem.config.cjs
+\`\`\`
+",
+  "compose.yaml": "services:
+  app:
+    build: .
+    ports:
+      - \${PORT:-3000}:3000
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  migrate:
+    build:
+      context: .
+      target: build
+    command:
+      - pnpm
+      - db:deploy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - \${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d app
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  postgres-data: {}
+",
+  "drizzle.config.ts": "import { existsSync } from 'node:fs';
+import { defineConfig } from 'drizzle-kit';
+
+// drizzle-kit doesn't read .env on its own.
+if (existsSync('.env')) process.loadEnvFile('.env');
+
+export default defineConfig({
+  dialect: 'postgresql',
+  schema: './src/db/schema.ts',
+  out: './drizzle',
+  dbCredentials: { url: process.env.DATABASE_URL ?? '' },
+});
+",
+  "drizzle/0000_init.sql": "CREATE TABLE "users" (
+	"id" text PRIMARY KEY NOT NULL,
+	"email" text NOT NULL,
+	"name" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "users_email_unique" UNIQUE("email")
+);
+",
+  "drizzle/meta/0000_snapshot.json": "{
+  "id": "6a73b831-ddd7-4a35-90aa-2533ee0eb253",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
+",
+  "drizzle/meta/_journal.json": "{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791661440873,
+      "tag": "0000_init",
+      "breakpoints": true
+    }
+  ]
+}
+",
+  "package.json": "{
+  "name": "my-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "build": "tsdown",
+    "db:deploy": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "drizzle-orm": "^0.45.4",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "pino-pretty": "^13.2.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.3.1",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
+",
+  "src/app.ts": "import { randomUUID } from 'node:crypto';
+import cors from 'cors';
+import express from 'express';
+import { rateLimit } from 'express-rate-limit';
+import helmet from 'helmet';
+import { pinoHttp } from 'pino-http';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { healthRouter } from './modules/health/health.routes';
+import { usersRouter } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it directly. */
+export function createApp() {
+  const app = express();
+
+  app.use(
+    pinoHttp({
+      logger,
+      // Reuse an incoming X-Request-Id (from a proxy) or create one, and echo it back.
+      genReqId: (req, res) => {
+        const id = req.headers['x-request-id']?.toString() || randomUUID();
+        res.setHeader('x-request-id', id);
+        return id;
+      },
+      autoLogging: { ignore: (req) => req.url === '/health' || req.url === '/ready' },
+    }),
+  );
+  app.use(helmet());
+  // Health checks stay outside CORS and rate limiting.
+  app.use(healthRouter);
+
+  app.use(cors({ origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') }));
+  app.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: env.RATE_LIMIT_PER_MINUTE,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+    }),
+  );
+  app.use(express.json({ limit: env.BODY_LIMIT }));
+
+  app.use('/users', usersRouter);
+  app.use(notFound);
+  app.use(errorHandler);
+
+  return app;
+}
+",
+  "src/config/env.ts": "import { z } from 'zod';
+
+/** Every environment variable the app reads, validated once at startup. */
+const EnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  CORS_ORIGIN: z.string().default('*'),
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
+  BODY_LIMIT: z.string().default('100kb'),
+  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+});
+
+const parsed = EnvSchema.safeParse(process.env);
+if (!parsed.success) {
+  console.error(\`Invalid environment variables:\\n\${z.prettifyError(parsed.error)}\`);
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export type Env = typeof env;
+",
+  "src/db/client.ts": "import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import { env } from '../config/env';
+import { addReadinessCheck } from '../lib/readiness';
+import * as schema from './schema';
+
+const pool = new Pool({ connectionString: env.DATABASE_URL });
+
+export const db = drizzle({ client: pool, schema });
+
+async function ping() {
+  await pool.query('SELECT 1');
+}
+
+/** Called once at startup: fail fast if the database can't be reached, then report it in /ready. */
+export async function connectDatabase() {
+  await ping();
+  addReadinessCheck('database', ping);
+}
+
+export async function disconnectDatabase() {
+  await pool.end();
+}
+",
+  "src/db/schema.ts": "import { randomUUID } from 'node:crypto';
+import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+
+export const users = pgTable('users', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => randomUUID()),
+  email: text('email').notNull().unique(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+",
+  "src/modules/users/users.repository.ts": "import { asc, eq } from 'drizzle-orm';
+import { DatabaseError } from 'pg';
+import { db } from '../../db/client';
+import { users } from '../../db/schema';
+import { EmailTakenError, type UsersRepository } from './users.schema';
+
+/** 23505: unique_violation, here the email. Drizzle wraps driver errors, so check the cause too. */
+function isUniqueViolation(error: unknown) {
+  const cause = error instanceof Error && error.cause ? error.cause : error;
+  return cause instanceof DatabaseError && cause.code === '23505';
+}
+
+export const usersRepository: UsersRepository = {
+  list: ({ limit, offset }) =>
+    db.select().from(users).orderBy(asc(users.createdAt)).limit(limit).offset(offset),
+
+  async findById(id) {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user ?? null;
+  },
+
+  async create(data) {
+    try {
+      const [user] = await db.insert(users).values(data).returning();
+      if (!user) throw new Error('Insert returned no row');
+      return user;
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async update(id, data) {
+    // An empty SET is invalid SQL, so a no-op update just reads the user.
+    if (Object.keys(data).length === 0) return usersRepository.findById(id);
+    try {
+      const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+      return user ?? null;
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async remove(id) {
+    const deleted = await db.delete(users).where(eq(users.id, id)).returning({ id: users.id });
+    return deleted.length > 0;
+  },
+};
+",
+  "src/modules/users/users.routes.ts": "import { Router } from 'express';
+import { HttpError } from '../../middleware/error-handler';
+import { usersRepository } from './users.repository';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+/** CRUD routes for users. Invalid input throws a ZodError, which the error handler sends as 400. */
+export const usersRouter = Router();
+
+const notFound = () => new HttpError(404, 'User not found');
+
+usersRouter.get('/', async (req, res) => {
+  res.json(await usersRepository.list(ListUsersSchema.parse(req.query)));
+});
+
+usersRouter.post('/', async (req, res) => {
+  const user = await usersRepository.create(CreateUserSchema.parse(req.body));
+  res.status(201).location(\`\${req.baseUrl}/\${user.id}\`).json(user);
+});
+
+usersRouter.get('/:id', async (req, res) => {
+  const user = await usersRepository.findById(req.params.id);
+  if (!user) throw notFound();
+  res.json(user);
+});
+
+usersRouter.patch('/:id', async (req, res) => {
+  const user = await usersRepository.update(req.params.id, UpdateUserSchema.parse(req.body));
+  if (!user) throw notFound();
+  res.json(user);
+});
+
+usersRouter.delete('/:id', async (req, res) => {
+  if (!(await usersRepository.remove(req.params.id))) throw notFound();
+  res.status(204).end();
+});
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "src/server.ts": "import { createApp } from './app';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { markShuttingDown } from './lib/readiness';
+import { connectDatabase, disconnectDatabase } from './db/client';
+
+try {
+  await connectDatabase();
+} catch (error) {
+  logger.fatal({ err: error }, 'Could not connect to the database. Is it running?');
+  process.exit(1);
+}
+
+const server = createApp().listen(env.PORT, () => {
+  logger.info(\`Listening on http://localhost:\${env.PORT}\`);
+  // Tells PM2 (wait_ready) that this worker can take traffic.
+  process.send?.('ready');
+});
+
+let shuttingDown = false;
+
+/** Stop taking new connections, let open requests finish, close resources, then exit. */
+function shutdown(reason: string, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Shutting down');
+  markShuttingDown();
+
+  const timer = setTimeout(() => {
+    logger.error('Open connections did not close in time, exiting');
+    process.exit(1);
+  }, env.SHUTDOWN_TIMEOUT_MS);
+  timer.unref();
+
+  server.close(async (error) => {
+    try {
+      await disconnectDatabase();
+    } catch (closeError) {
+      logger.error({ err: closeError }, 'Error while closing the database');
+    }
+    if (error) logger.error({ err: error }, 'Error while closing the server');
+    process.exit(error ? 1 : exitCode);
+  });
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  shutdown('unhandledRejection', 1);
+});
+process.on('uncaughtException', (error) => {
+  logger.fatal({ err: error }, 'Uncaught exception');
+  shutdown('uncaughtException', 1);
+});
+",
+  "tests/users.test.ts": "import { randomUUID } from 'node:crypto';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app';
+import {
+  EmailTakenError,
+  type User,
+  type UsersRepository,
+} from '../src/modules/users/users.schema';
+
+// The routes are tested against an in-memory repository, so these tests need no database.
+const users = new Map<string, User>();
+
+vi.mock('../src/modules/users/users.repository', () => {
+  const emailTaken = (email: string | undefined, id?: string) =>
+    [...users.values()].some((user) => user.email === email && user.id !== id);
+
+  const usersRepository: UsersRepository = {
+    list: async ({ limit, offset }) => [...users.values()].slice(offset, offset + limit),
+    findById: async (id) => users.get(id) ?? null,
+    create: async (data) => {
+      if (emailTaken(data.email)) throw new EmailTakenError();
+      const now = new Date();
+      const user = { id: randomUUID(), ...data, createdAt: now, updatedAt: now };
+      users.set(user.id, user);
+      return user;
+    },
+    update: async (id, data) => {
+      const user = users.get(id);
+      if (!user) return null;
+      if (emailTaken(data.email, id)) throw new EmailTakenError();
+      const updated = { ...user, ...data, updatedAt: new Date() };
+      users.set(id, updated);
+      return updated;
+    },
+    remove: async (id) => users.delete(id),
+  };
+  return { usersRepository };
+});
+
+const app = createApp();
+const ada = { email: 'ada@example.com', name: 'Ada Lovelace' };
+
+describe('users', () => {
+  beforeEach(() => users.clear());
+
+  it('creates, reads, updates and deletes a user', async () => {
+    const created = await request(app).post('/users').send(ada);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject(ada);
+    const { id } = created.body;
+    expect(created.headers.location).toBe(\`/users/\${id}\`);
+
+    expect((await request(app).get(\`/users/\${id}\`)).body).toMatchObject(ada);
+    expect((await request(app).get('/users')).body).toHaveLength(1);
+
+    const updated = await request(app).patch(\`/users/\${id}\`).send({ name: 'Ada King' });
+    expect(updated.status).toBe(200);
+    expect(updated.body.name).toBe('Ada King');
+
+    expect((await request(app).delete(\`/users/\${id}\`)).status).toBe(204);
+    expect((await request(app).get(\`/users/\${id}\`)).status).toBe(404);
+  });
+
+  it('rejects an invalid body with 400', async () => {
+    const response = await request(app).post('/users').send({ email: 'not-an-email' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.details.fieldErrors).toHaveProperty('email');
+  });
+
+  it('rejects a duplicate email with 409', async () => {
+    await request(app).post('/users').send(ada);
+    const response = await request(app).post('/users').send(ada);
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.message).toMatch(/already exists/);
+  });
+
+  it('answers 404 for an unknown id', async () => {
+    expect((await request(app).get('/users/unknown')).status).toBe(404);
+    expect((await request(app).patch('/users/unknown').send({ name: 'x' })).status).toBe(404);
+    expect((await request(app).delete('/users/unknown')).status).toBe(404);
+  });
+});
+",
+}
+`;
+
+exports[`generated project > --db mongoose 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted JSON request body
+BODY_LIMIT=100kb
+
+# Database connection string
+DATABASE_URL=mongodb://localhost:27017/app
+",
+  "README.md": "# my-api
+
+Generated with [create-prodforge](https://github.com/Keyan-dev/create-prodforge).
+
+## Getting started
+
+\`\`\`bash
+cp .env.example .env
+docker compose up -d mongo
+pnpm dev
+\`\`\`
+
+The server starts on \`http://localhost:3000\`. Check it with \`curl localhost:3000/health\`.
+
+## Scripts
+
+- \`pnpm dev\`: start the server and restart on changes
+- \`pnpm build\`: bundle to \`dist/\` with tsdown
+- \`pnpm start\`: run the built server
+- \`pnpm test\`: run the tests once
+- \`pnpm lint\`: lint with ESLint
+- \`pnpm format\`: format with Prettier
+- \`pnpm typecheck\`: type-check without emitting
+
+## Configuration
+
+Settings come from environment variables, validated at startup in \`src/config/env.ts\`. See \`.env.example\` for the full list. In development they are read from \`.env\`.
+
+## Endpoints
+
+- \`GET /health\`: the process is up (liveness)
+- \`GET /ready\`: dependencies are reachable and the server isn't shutting down (readiness)
+
+## Database
+
+Mongoose with MongoDB. Models live next to their module (\`src/modules/*/*.model.ts\`). There are no migrations: collections are created on first write, and indexes are built from the models when the app connects.
+
+## Example users module
+
+\`src/modules/users\` is a small CRUD API that shows the database wiring end to end:
+
+- \`GET /users?limit=20&offset=0\`: list users
+- \`POST /users\`: create one from \`{ "email", "name" }\`
+- \`GET /users/:id\`, \`PATCH /users/:id\`, \`DELETE /users/:id\`
+
+Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the \`usersRouter\` lines in \`src/app.ts\`.
+
+## Docker
+
+\`\`\`bash
+docker compose up --build
+\`\`\`
+
+The image is a multi-stage build on \`node:alpine\` that runs as the non-root \`node\` user, with a \`HEALTHCHECK\` on \`/health\`. Commit your lockfile first: the build installs from it.
+
+## PM2
+
+For a VM or bare-metal server. Build, then start one worker per CPU in cluster mode:
+
+\`\`\`bash
+npm install --global pm2@7.0.4
+pm2 start ecosystem.config.cjs
+\`\`\`
+",
+  "compose.yaml": "services:
+  app:
+    build: .
+    ports:
+      - \${PORT:-3000}:3000
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DATABASE_URL: mongodb://mongo:27017/app
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+  mongo:
+    image: mongo:8
+    ports:
+      - \${MONGO_PORT:-27017}:27017
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - db.adminCommand('ping')
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  mongo-data: {}
+",
+  "package.json": "{
+  "name": "my-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "mongoose": "^9.11.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "pino-pretty": "^13.2.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.3.1",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
+",
+  "src/app.ts": "import { randomUUID } from 'node:crypto';
+import cors from 'cors';
+import express from 'express';
+import { rateLimit } from 'express-rate-limit';
+import helmet from 'helmet';
+import { pinoHttp } from 'pino-http';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { healthRouter } from './modules/health/health.routes';
+import { usersRouter } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it directly. */
+export function createApp() {
+  const app = express();
+
+  app.use(
+    pinoHttp({
+      logger,
+      // Reuse an incoming X-Request-Id (from a proxy) or create one, and echo it back.
+      genReqId: (req, res) => {
+        const id = req.headers['x-request-id']?.toString() || randomUUID();
+        res.setHeader('x-request-id', id);
+        return id;
+      },
+      autoLogging: { ignore: (req) => req.url === '/health' || req.url === '/ready' },
+    }),
+  );
+  app.use(helmet());
+  // Health checks stay outside CORS and rate limiting.
+  app.use(healthRouter);
+
+  app.use(cors({ origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') }));
+  app.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: env.RATE_LIMIT_PER_MINUTE,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+    }),
+  );
+  app.use(express.json({ limit: env.BODY_LIMIT }));
+
+  app.use('/users', usersRouter);
+  app.use(notFound);
+  app.use(errorHandler);
+
+  return app;
+}
+",
+  "src/config/env.ts": "import { z } from 'zod';
+
+/** Every environment variable the app reads, validated once at startup. */
+const EnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  CORS_ORIGIN: z.string().default('*'),
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
+  BODY_LIMIT: z.string().default('100kb'),
+  DATABASE_URL: z.url({ protocol: /^mongodb(\\+srv)?$/ }),
+});
+
+const parsed = EnvSchema.safeParse(process.env);
+if (!parsed.success) {
+  console.error(\`Invalid environment variables:\\n\${z.prettifyError(parsed.error)}\`);
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export type Env = typeof env;
+",
+  "src/db/client.ts": "import mongoose from 'mongoose';
+import { env } from '../config/env';
+import { addReadinessCheck } from '../lib/readiness';
+
+async function ping() {
+  const { db } = mongoose.connection;
+  if (!db) throw new Error('Not connected to MongoDB');
+  await db.admin().ping();
+}
+
+/**
+ * Called once at startup: connect (failing fast if MongoDB can't be reached), build model
+ * indexes, then report the connection in /ready.
+ */
+export async function connectDatabase() {
+  await mongoose.connect(env.DATABASE_URL, { serverSelectionTimeoutMS: 5000 });
+  // Wait for indexes (such as unique constraints) so they hold from the first request.
+  await Promise.all(mongoose.modelNames().map((name) => mongoose.model(name).init()));
+  addReadinessCheck('database', ping);
+}
+
+export async function disconnectDatabase() {
+  await mongoose.disconnect();
+}
+",
+  "src/modules/users/users.model.ts": "import { model, Schema } from 'mongoose';
+
+const userSchema = new Schema(
+  {
+    email: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
+  },
+  { timestamps: true },
+);
+
+export const UserModel = model('User', userSchema);
+",
+  "src/modules/users/users.repository.ts": "import { isValidObjectId, mongo, type Types } from 'mongoose';
+import { UserModel } from './users.model';
+import { EmailTakenError, type User, type UsersRepository } from './users.schema';
+
+interface UserDocument {
+  _id: Types.ObjectId;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+function toUser({ _id, email, name, createdAt, updatedAt }: UserDocument): User {
+  return { id: _id.toString(), email, name, createdAt, updatedAt };
+}
+
+/** 11000: duplicate key, here the unique email index. */
+function isDuplicateKey(error: unknown) {
+  return error instanceof mongo.MongoServerError && error.code === 11000;
+}
+
+export const usersRepository: UsersRepository = {
+  async list({ limit, offset }) {
+    const docs = await UserModel.find().sort({ createdAt: 1 }).skip(offset).limit(limit).lean();
+    return docs.map(toUser);
+  },
+
+  async findById(id) {
+    if (!isValidObjectId(id)) return null;
+    const doc = await UserModel.findById(id).lean();
+    return doc && toUser(doc);
+  },
+
+  async create(data) {
+    try {
+      const doc = await UserModel.create(data);
+      return toUser(doc.toObject());
+    } catch (error) {
+      if (isDuplicateKey(error)) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async update(id, data) {
+    if (!isValidObjectId(id)) return null;
+    try {
+      const doc = await UserModel.findByIdAndUpdate(id, data, {
+        new: true,
+        runValidators: true,
+      }).lean();
+      return doc && toUser(doc);
+    } catch (error) {
+      if (isDuplicateKey(error)) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async remove(id) {
+    if (!isValidObjectId(id)) return false;
+    return (await UserModel.findByIdAndDelete(id)) !== null;
+  },
+};
+",
+  "src/modules/users/users.routes.ts": "import { Router } from 'express';
+import { HttpError } from '../../middleware/error-handler';
+import { usersRepository } from './users.repository';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+/** CRUD routes for users. Invalid input throws a ZodError, which the error handler sends as 400. */
+export const usersRouter = Router();
+
+const notFound = () => new HttpError(404, 'User not found');
+
+usersRouter.get('/', async (req, res) => {
+  res.json(await usersRepository.list(ListUsersSchema.parse(req.query)));
+});
+
+usersRouter.post('/', async (req, res) => {
+  const user = await usersRepository.create(CreateUserSchema.parse(req.body));
+  res.status(201).location(\`\${req.baseUrl}/\${user.id}\`).json(user);
+});
+
+usersRouter.get('/:id', async (req, res) => {
+  const user = await usersRepository.findById(req.params.id);
+  if (!user) throw notFound();
+  res.json(user);
+});
+
+usersRouter.patch('/:id', async (req, res) => {
+  const user = await usersRepository.update(req.params.id, UpdateUserSchema.parse(req.body));
+  if (!user) throw notFound();
+  res.json(user);
+});
+
+usersRouter.delete('/:id', async (req, res) => {
+  if (!(await usersRepository.remove(req.params.id))) throw notFound();
+  res.status(204).end();
+});
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "src/server.ts": "import { createApp } from './app';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { markShuttingDown } from './lib/readiness';
+import { connectDatabase, disconnectDatabase } from './db/client';
+
+try {
+  await connectDatabase();
+} catch (error) {
+  logger.fatal({ err: error }, 'Could not connect to the database. Is it running?');
+  process.exit(1);
+}
+
+const server = createApp().listen(env.PORT, () => {
+  logger.info(\`Listening on http://localhost:\${env.PORT}\`);
+  // Tells PM2 (wait_ready) that this worker can take traffic.
+  process.send?.('ready');
+});
+
+let shuttingDown = false;
+
+/** Stop taking new connections, let open requests finish, close resources, then exit. */
+function shutdown(reason: string, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Shutting down');
+  markShuttingDown();
+
+  const timer = setTimeout(() => {
+    logger.error('Open connections did not close in time, exiting');
+    process.exit(1);
+  }, env.SHUTDOWN_TIMEOUT_MS);
+  timer.unref();
+
+  server.close(async (error) => {
+    try {
+      await disconnectDatabase();
+    } catch (closeError) {
+      logger.error({ err: closeError }, 'Error while closing the database');
+    }
+    if (error) logger.error({ err: error }, 'Error while closing the server');
+    process.exit(error ? 1 : exitCode);
+  });
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  shutdown('unhandledRejection', 1);
+});
+process.on('uncaughtException', (error) => {
+  logger.fatal({ err: error }, 'Uncaught exception');
+  shutdown('uncaughtException', 1);
+});
+",
+  "tests/users.test.ts": "import { randomUUID } from 'node:crypto';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app';
+import {
+  EmailTakenError,
+  type User,
+  type UsersRepository,
+} from '../src/modules/users/users.schema';
+
+// The routes are tested against an in-memory repository, so these tests need no database.
+const users = new Map<string, User>();
+
+vi.mock('../src/modules/users/users.repository', () => {
+  const emailTaken = (email: string | undefined, id?: string) =>
+    [...users.values()].some((user) => user.email === email && user.id !== id);
+
+  const usersRepository: UsersRepository = {
+    list: async ({ limit, offset }) => [...users.values()].slice(offset, offset + limit),
+    findById: async (id) => users.get(id) ?? null,
+    create: async (data) => {
+      if (emailTaken(data.email)) throw new EmailTakenError();
+      const now = new Date();
+      const user = { id: randomUUID(), ...data, createdAt: now, updatedAt: now };
+      users.set(user.id, user);
+      return user;
+    },
+    update: async (id, data) => {
+      const user = users.get(id);
+      if (!user) return null;
+      if (emailTaken(data.email, id)) throw new EmailTakenError();
+      const updated = { ...user, ...data, updatedAt: new Date() };
+      users.set(id, updated);
+      return updated;
+    },
+    remove: async (id) => users.delete(id),
+  };
+  return { usersRepository };
+});
+
+const app = createApp();
+const ada = { email: 'ada@example.com', name: 'Ada Lovelace' };
+
+describe('users', () => {
+  beforeEach(() => users.clear());
+
+  it('creates, reads, updates and deletes a user', async () => {
+    const created = await request(app).post('/users').send(ada);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject(ada);
+    const { id } = created.body;
+    expect(created.headers.location).toBe(\`/users/\${id}\`);
+
+    expect((await request(app).get(\`/users/\${id}\`)).body).toMatchObject(ada);
+    expect((await request(app).get('/users')).body).toHaveLength(1);
+
+    const updated = await request(app).patch(\`/users/\${id}\`).send({ name: 'Ada King' });
+    expect(updated.status).toBe(200);
+    expect(updated.body.name).toBe('Ada King');
+
+    expect((await request(app).delete(\`/users/\${id}\`)).status).toBe(204);
+    expect((await request(app).get(\`/users/\${id}\`)).status).toBe(404);
+  });
+
+  it('rejects an invalid body with 400', async () => {
+    const response = await request(app).post('/users').send({ email: 'not-an-email' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.details.fieldErrors).toHaveProperty('email');
+  });
+
+  it('rejects a duplicate email with 409', async () => {
+    await request(app).post('/users').send(ada);
+    const response = await request(app).post('/users').send(ada);
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.message).toMatch(/already exists/);
+  });
+
+  it('answers 404 for an unknown id', async () => {
+    expect((await request(app).get('/users/unknown')).status).toBe(404);
+    expect((await request(app).patch('/users/unknown').send({ name: 'x' })).status).toBe(404);
+    expect((await request(app).delete('/users/unknown')).status).toBe(404);
+  });
+});
+",
+}
+`;
+
+exports[`generated project > --db none has no database or users module 1`] = `
+"services:
+  app:
+    build: .
+    ports:
+      - \${PORT:-3000}:3000
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+    restart: unless-stopped
+"
+`;
+
+exports[`generated project > --db none has no database or users module 2`] = `
+"import { createApp } from './app';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { markShuttingDown } from './lib/readiness';
+
+const server = createApp().listen(env.PORT, () => {
+  logger.info(\`Listening on http://localhost:\${env.PORT}\`);
+  // Tells PM2 (wait_ready) that this worker can take traffic.
+  process.send?.('ready');
+});
+
+let shuttingDown = false;
+
+/** Stop taking new connections, let open requests finish, close resources, then exit. */
+function shutdown(reason: string, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Shutting down');
+  markShuttingDown();
+
+  const timer = setTimeout(() => {
+    logger.error('Open connections did not close in time, exiting');
+    process.exit(1);
+  }, env.SHUTDOWN_TIMEOUT_MS);
+  timer.unref();
+
+  server.close(async (error) => {
+    if (error) logger.error({ err: error }, 'Error while closing the server');
+    process.exit(error ? 1 : exitCode);
+  });
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  shutdown('unhandledRejection', 1);
+});
+process.on('uncaughtException', (error) => {
+  logger.fatal({ err: error }, 'Uncaught exception');
+  shutdown('uncaughtException', 1);
+});
+"
+`;
+
 exports[`generated project > --yes defaults (express, vitest, eslint, pnpm, node 24) 1`] = `
 {
   "features": [
     "base",
     "framework-express",
+    "db-prisma",
+    "example-users",
     "testing-vitest",
     "lint-eslint",
     "docker",
@@ -21,6 +1381,7 @@ coverage
 *.log
 Dockerfile
 compose.yaml
+src/generated
 ",
     ".editorconfig": "root = true
 
@@ -55,6 +1416,9 @@ RATE_LIMIT_PER_MINUTE=100
 
 # Largest accepted JSON request body
 BODY_LIMIT=100kb
+
+# Database connection string
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
 ",
     ".gitignore": "node_modules/
 dist/
@@ -62,6 +1426,7 @@ coverage/
 .env
 *.log
 .DS_Store
+/src/generated/
 ",
     ".nvmrc": "24
 ",
@@ -85,16 +1450,19 @@ RUN npm install --global pnpm@10.28.0
 # All dependencies, for building.
 FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
+COPY prisma.config.ts ./
+COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 COPY . .
 RUN pnpm build
 
-# Production dependencies only, for the final image.
+# Production dependencies only, for the final image. Scripts are skipped: install hooks such as
+# code generation already ran in the deps stage, and their tools are dev dependencies.
 FROM base AS prod-deps
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 FROM node:\${NODE_VERSION}-alpine AS runtime
 ENV NODE_ENV=production
@@ -117,6 +1485,8 @@ Generated with [create-prodforge](https://github.com/Keyan-dev/create-prodforge)
 
 \`\`\`bash
 cp .env.example .env
+docker compose up -d postgres
+pnpm db:deploy
 pnpm dev
 \`\`\`
 
@@ -140,6 +1510,20 @@ Settings come from environment variables, validated at startup in \`src/config/e
 
 - \`GET /health\`: the process is up (liveness)
 - \`GET /ready\`: dependencies are reachable and the server isn't shutting down (readiness)
+
+## Database
+
+Prisma with PostgreSQL. The schema is \`prisma/schema.prisma\`. After changing it, run \`pnpm db:migrate\` to create and apply a migration (it asks for a name). The client is generated into \`src/generated/prisma\` on install; \`pnpm db:generate\` regenerates it. \`pnpm db:deploy\` applies pending migrations without creating new ones, which is what deploys and the compose \`migrate\` service run.
+
+## Example users module
+
+\`src/modules/users\` is a small CRUD API that shows the database wiring end to end:
+
+- \`GET /users?limit=20&offset=0\`: list users
+- \`POST /users\`: create one from \`{ "email", "name" }\`
+- \`GET /users/:id\`, \`PATCH /users/:id\`, \`DELETE /users/:id\`
+
+Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the \`usersRouter\` lines in \`src/app.ts\`.
 
 ## Docker
 
@@ -169,7 +1553,44 @@ pm2 start ecosystem.config.cjs
     environment:
       NODE_ENV: production
       PORT: '3000'
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  migrate:
+    build:
+      context: .
+      target: build
+    command:
+      - pnpm
+      - db:deploy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - \${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d app
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  postgres-data: {}
 ",
     "ecosystem.config.cjs": "// PM2 process file. On the server: npm install --global pm2@7.0.4
 // Build first, then: pm2 start ecosystem.config.cjs
@@ -230,10 +1651,15 @@ export default tseslint.config(
   "packageManager": "pnpm@10.28.0",
   "scripts": {
     "build": "tsdown",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
     "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "postinstall": "prisma generate",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -241,10 +1667,13 @@ export default tseslint.config(
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "cors": "^2.8.6",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
+    "pg": "^8.23.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "zod": "^4.6.5"
@@ -254,6 +1683,7 @@ export default tseslint.config(
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^10.12.0",
@@ -261,6 +1691,7 @@ export default tseslint.config(
     "globals": "^17.13.0",
     "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
+    "prisma": "^7.10.0",
     "supertest": "^7.3.1",
     "tsdown": "^0.23.1",
     "tsx": "^4.23.15",
@@ -270,9 +1701,60 @@ export default tseslint.config(
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
     ]
   }
+}
+",
+    "prisma.config.ts": "import { existsSync } from 'node:fs';
+import { defineConfig } from 'prisma/config';
+
+// The Prisma CLI doesn't read .env on its own.
+if (existsSync('.env')) process.loadEnvFile('.env');
+
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  migrations: { path: 'prisma/migrations' },
+  datasource: { url: process.env.DATABASE_URL },
+});
+",
+    "prisma/migrations/20261010000000_init/migration.sql": "-- CreateTable
+CREATE TABLE "users" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+",
+    "prisma/migrations/migration_lock.toml": "# Please do not edit this file manually
+# It should be added in your version-control system (e.g., Git)
+provider = "postgresql"
+",
+    "prisma/schema.prisma": "generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
 }
 ",
     "src/app.ts": "import { randomUUID } from 'node:crypto';
@@ -285,6 +1767,7 @@ import { env } from './config/env';
 import { logger } from './lib/logger';
 import { errorHandler, notFound } from './middleware/error-handler';
 import { healthRouter } from './modules/health/health.routes';
+import { usersRouter } from './modules/users/users.routes';
 
 /** Build the app without listening, so tests can drive it directly. */
 export function createApp() {
@@ -317,6 +1800,7 @@ export function createApp() {
   );
   app.use(express.json({ limit: env.BODY_LIMIT }));
 
+  app.use('/users', usersRouter);
   app.use(notFound);
   app.use(errorHandler);
 
@@ -334,6 +1818,7 @@ const EnvSchema = z.object({
   CORS_ORIGIN: z.string().default('*'),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
   BODY_LIMIT: z.string().default('100kb'),
+  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
 });
 
 const parsed = EnvSchema.safeParse(process.env);
@@ -344,6 +1829,29 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 export type Env = typeof env;
+",
+    "src/db/client.ts": "import { PrismaPg } from '@prisma/adapter-pg';
+import { env } from '../config/env';
+import { PrismaClient } from '../generated/prisma/client';
+import { addReadinessCheck } from '../lib/readiness';
+
+export const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: env.DATABASE_URL }),
+});
+
+async function ping() {
+  await prisma.$queryRaw\`SELECT 1\`;
+}
+
+/** Called once at startup: fail fast if the database can't be reached, then report it in /ready. */
+export async function connectDatabase() {
+  await ping();
+  addReadinessCheck('database', ping);
+}
+
+export async function disconnectDatabase() {
+  await prisma.$disconnect();
+}
 ",
     "src/lib/logger.ts": "import { pino } from 'pino';
 import { env } from '../config/env';
@@ -364,6 +1872,11 @@ export interface ReadinessCheck {
 }
 
 const checks: ReadinessCheck[] = [];
+
+/** Register a dependency check, e.g. from the module that opens a database connection. */
+export function addReadinessCheck(name: string, check: () => Promise<void>) {
+  checks.push({ name, check });
+}
 
 let shuttingDown = false;
 
@@ -454,10 +1967,146 @@ healthRouter.get('/ready', async (_req, res) => {
   res.status(result.ready ? 200 : 503).json(result);
 });
 ",
+    "src/modules/users/users.repository.ts": "import { prisma } from '../../db/client';
+import { Prisma } from '../../generated/prisma/client';
+import { EmailTakenError, type UsersRepository } from './users.schema';
+
+/** P2002: unique constraint failed (the email). P2025: the record to change doesn't exist. */
+function isPrismaError(error: unknown, code: string) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
+}
+
+export const usersRepository: UsersRepository = {
+  list: ({ limit, offset }) =>
+    prisma.user.findMany({ orderBy: { createdAt: 'asc' }, take: limit, skip: offset }),
+
+  findById: (id) => prisma.user.findUnique({ where: { id } }),
+
+  async create(data) {
+    try {
+      return await prisma.user.create({ data });
+    } catch (error) {
+      if (isPrismaError(error, 'P2002')) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async update(id, data) {
+    try {
+      return await prisma.user.update({ where: { id }, data });
+    } catch (error) {
+      if (isPrismaError(error, 'P2025')) return null;
+      if (isPrismaError(error, 'P2002')) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async remove(id) {
+    const { count } = await prisma.user.deleteMany({ where: { id } });
+    return count > 0;
+  },
+};
+",
+    "src/modules/users/users.routes.ts": "import { Router } from 'express';
+import { HttpError } from '../../middleware/error-handler';
+import { usersRepository } from './users.repository';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+/** CRUD routes for users. Invalid input throws a ZodError, which the error handler sends as 400. */
+export const usersRouter = Router();
+
+const notFound = () => new HttpError(404, 'User not found');
+
+usersRouter.get('/', async (req, res) => {
+  res.json(await usersRepository.list(ListUsersSchema.parse(req.query)));
+});
+
+usersRouter.post('/', async (req, res) => {
+  const user = await usersRepository.create(CreateUserSchema.parse(req.body));
+  res.status(201).location(\`\${req.baseUrl}/\${user.id}\`).json(user);
+});
+
+usersRouter.get('/:id', async (req, res) => {
+  const user = await usersRepository.findById(req.params.id);
+  if (!user) throw notFound();
+  res.json(user);
+});
+
+usersRouter.patch('/:id', async (req, res) => {
+  const user = await usersRepository.update(req.params.id, UpdateUserSchema.parse(req.body));
+  if (!user) throw notFound();
+  res.json(user);
+});
+
+usersRouter.delete('/:id', async (req, res) => {
+  if (!(await usersRepository.remove(req.params.id))) throw notFound();
+  res.status(204).end();
+});
+",
+    "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
     "src/server.ts": "import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './lib/logger';
 import { markShuttingDown } from './lib/readiness';
+import { connectDatabase, disconnectDatabase } from './db/client';
+
+try {
+  await connectDatabase();
+} catch (error) {
+  logger.fatal({ err: error }, 'Could not connect to the database. Is it running?');
+  process.exit(1);
+}
 
 const server = createApp().listen(env.PORT, () => {
   logger.info(\`Listening on http://localhost:\${env.PORT}\`);
@@ -481,6 +2130,11 @@ function shutdown(reason: string, exitCode = 0) {
   timer.unref();
 
   server.close(async (error) => {
+    try {
+      await disconnectDatabase();
+    } catch (closeError) {
+      logger.error({ err: closeError }, 'Error while closing the database');
+    }
     if (error) logger.error({ err: error }, 'Error while closing the server');
     process.exit(error ? 1 : exitCode);
   });
@@ -553,6 +2207,92 @@ describe('health', () => {
   });
 });
 ",
+    "tests/users.test.ts": "import { randomUUID } from 'node:crypto';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app';
+import {
+  EmailTakenError,
+  type User,
+  type UsersRepository,
+} from '../src/modules/users/users.schema';
+
+// The routes are tested against an in-memory repository, so these tests need no database.
+const users = new Map<string, User>();
+
+vi.mock('../src/modules/users/users.repository', () => {
+  const emailTaken = (email: string | undefined, id?: string) =>
+    [...users.values()].some((user) => user.email === email && user.id !== id);
+
+  const usersRepository: UsersRepository = {
+    list: async ({ limit, offset }) => [...users.values()].slice(offset, offset + limit),
+    findById: async (id) => users.get(id) ?? null,
+    create: async (data) => {
+      if (emailTaken(data.email)) throw new EmailTakenError();
+      const now = new Date();
+      const user = { id: randomUUID(), ...data, createdAt: now, updatedAt: now };
+      users.set(user.id, user);
+      return user;
+    },
+    update: async (id, data) => {
+      const user = users.get(id);
+      if (!user) return null;
+      if (emailTaken(data.email, id)) throw new EmailTakenError();
+      const updated = { ...user, ...data, updatedAt: new Date() };
+      users.set(id, updated);
+      return updated;
+    },
+    remove: async (id) => users.delete(id),
+  };
+  return { usersRepository };
+});
+
+const app = createApp();
+const ada = { email: 'ada@example.com', name: 'Ada Lovelace' };
+
+describe('users', () => {
+  beforeEach(() => users.clear());
+
+  it('creates, reads, updates and deletes a user', async () => {
+    const created = await request(app).post('/users').send(ada);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject(ada);
+    const { id } = created.body;
+    expect(created.headers.location).toBe(\`/users/\${id}\`);
+
+    expect((await request(app).get(\`/users/\${id}\`)).body).toMatchObject(ada);
+    expect((await request(app).get('/users')).body).toHaveLength(1);
+
+    const updated = await request(app).patch(\`/users/\${id}\`).send({ name: 'Ada King' });
+    expect(updated.status).toBe(200);
+    expect(updated.body.name).toBe('Ada King');
+
+    expect((await request(app).delete(\`/users/\${id}\`)).status).toBe(204);
+    expect((await request(app).get(\`/users/\${id}\`)).status).toBe(404);
+  });
+
+  it('rejects an invalid body with 400', async () => {
+    const response = await request(app).post('/users').send({ email: 'not-an-email' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.details.fieldErrors).toHaveProperty('email');
+  });
+
+  it('rejects a duplicate email with 409', async () => {
+    await request(app).post('/users').send(ada);
+    const response = await request(app).post('/users').send(ada);
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.message).toMatch(/already exists/);
+  });
+
+  it('answers 404 for an unknown id', async () => {
+    expect((await request(app).get('/users/unknown')).status).toBe(404);
+    expect((await request(app).patch('/users/unknown').send({ name: 'x' })).status).toBe(404);
+    expect((await request(app).delete('/users/unknown')).status).toBe(404);
+  });
+});
+",
     "tsconfig.json": "{
   "compilerOptions": {
     "target": "es2023",
@@ -583,17 +2323,31 @@ export default defineConfig({
   clean: true,
 });
 ",
-    "vitest.config.ts": "import { defineConfig } from 'vitest/config';
+    "vitest.config.ts": "import { existsSync, readFileSync } from 'node:fs';
+import { parseEnv } from 'node:util';
+import { defineConfig } from 'vitest/config';
+
+// Tests run with the settings from .env.example (so required variables such as DATABASE_URL
+// are set), quiet and in test mode. Values already in the environment win.
+const example = existsSync('.env.example') ? parseEnv(readFileSync('.env.example', 'utf8')) : {};
 
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
+    env: { ...example, LOG_LEVEL: 'silent', ...process.env, NODE_ENV: 'test' },
     coverage: { provider: 'v8', include: ['src/**'] },
   },
 });
 ",
   },
 }
+`;
+
+exports[`generated project > drizzle without the example module 1`] = `
+"// Define your tables here, then run the db:generate script to create a migration.
+// See https://orm.drizzle.team/docs/sql-schema-declaration
+export {};
+"
 `;
 
 exports[`generated project > npm Dockerfile 1`] = `
@@ -607,16 +2361,19 @@ WORKDIR /app
 # All dependencies, for building.
 FROM base AS deps
 COPY package.json package-lock.json ./
+COPY prisma.config.ts ./
+COPY prisma ./prisma
 RUN npm ci
 
 FROM deps AS build
 COPY . .
 RUN npm run build
 
-# Production dependencies only, for the final image.
+# Production dependencies only, for the final image. Scripts are skipped: install hooks such as
+# code generation already ran in the deps stage, and their tools are dev dependencies.
 FROM base AS prod-deps
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 FROM node:\${NODE_VERSION}-alpine AS runtime
 ENV NODE_ENV=production
@@ -644,10 +2401,15 @@ exports[`generated project > npm on node 22 1`] = `
   },
   "scripts": {
     "build": "tsdown",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
     "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "postinstall": "prisma generate",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -655,10 +2417,13 @@ exports[`generated project > npm on node 22 1`] = `
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "cors": "^2.8.6",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
+    "pg": "^8.23.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "zod": "^4.6.5"
@@ -668,6 +2433,7 @@ exports[`generated project > npm on node 22 1`] = `
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^5.0.3",
     "eslint": "^10.12.0",
@@ -675,6 +2441,7 @@ exports[`generated project > npm on node 22 1`] = `
     "globals": "^17.13.0",
     "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
+    "prisma": "^7.10.0",
     "supertest": "^7.3.1",
     "tsdown": "^0.23.1",
     "tsx": "^4.23.15",
@@ -695,6 +2462,8 @@ Generated with [create-prodforge](https://github.com/Keyan-dev/create-prodforge)
 
 \`\`\`bash
 cp .env.example .env
+docker compose up -d postgres
+npm run db:deploy
 npm run dev
 \`\`\`
 
@@ -718,6 +2487,20 @@ Settings come from environment variables, validated at startup in \`src/config/e
 
 - \`GET /health\`: the process is up (liveness)
 - \`GET /ready\`: dependencies are reachable and the server isn't shutting down (readiness)
+
+## Database
+
+Prisma with PostgreSQL. The schema is \`prisma/schema.prisma\`. After changing it, run \`npm run db:migrate\` to create and apply a migration (it asks for a name). The client is generated into \`src/generated/prisma\` on install; \`npm run db:generate\` regenerates it. \`npm run db:deploy\` applies pending migrations without creating new ones, which is what deploys and the compose \`migrate\` service run.
+
+## Example users module
+
+\`src/modules/users\` is a small CRUD API that shows the database wiring end to end:
+
+- \`GET /users?limit=20&offset=0\`: list users
+- \`POST /users\`: create one from \`{ "email", "name" }\`
+- \`GET /users/:id\`, \`PATCH /users/:id\`, \`DELETE /users/:id\`
+
+Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the \`usersRouter\` lines in \`src/app.ts\`.
 
 ## Docker
 

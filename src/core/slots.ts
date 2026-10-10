@@ -15,6 +15,8 @@ export interface Injection {
   path: string;
   slot: string;
   code: string;
+  /** Skip the injection if no feature wrote the file (e.g. the Dockerfile when Docker is off). */
+  optional?: boolean;
 }
 
 /** Names of every slot marker in `content`, in order. */

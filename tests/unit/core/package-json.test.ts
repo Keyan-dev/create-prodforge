@@ -17,6 +17,12 @@ describe('PackageJsonBuilder', () => {
     });
   });
 
+  it('collects packages allowed to run install scripts', () => {
+    const pkg = new PackageJsonBuilder().allowBuilds('esbuild').allowBuilds('prisma', 'esbuild');
+    expect(pkg.toJSON()).toEqual({ pnpm: { onlyBuiltDependencies: ['esbuild', 'prisma'] } });
+    expect(new PackageJsonBuilder().toJSON()).toEqual({});
+  });
+
   it('accepts the same dependency twice when the versions agree', () => {
     const pkg = new PackageJsonBuilder()
       .addDevDeps({ vitest: '5.0.3' })

@@ -16,5 +16,5 @@
     "noEmit": true
   },
   "include": ["src", "tests", "scripts", "*.config.ts"],
-  "exclude": ["src/features/*/files"]
+  "exclude": ["src/features/*/files", "src/features/*/files-*"]
 }
