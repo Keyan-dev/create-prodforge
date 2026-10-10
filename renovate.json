@@ -4,5 +4,14 @@
   "schedule": ["before 6am on monday"],
   "packageRules": [
     { "matchUpdateTypes": ["patch", "minor"], "groupName": "non-major dependencies" }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Versions used in generated projects",
+      "managerFilePatterns": ["/^src/core/versions\\.ts$/"],
+      "matchStrings": ["'(?<depName>[^']+)': '(?<currentValue>[^']+)',"],
+      "datasourceTemplate": "npm"
+    }
   ]
 }

@@ -41,7 +41,9 @@
     "release": "pnpm build && changeset publish"
   },
   "dependencies": {
-    "citty": "^0.2.2"
+    "citty": "^0.2.2",
+    "eta": "^4.6.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",
