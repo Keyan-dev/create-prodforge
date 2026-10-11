@@ -238,7 +238,7 @@ Each phase is one or two AI sessions. **Done when** describes the acceptance che
 - [x] Phase 1 — Core engine
 - [x] Phase 2 — Minimal working generator
 - [x] Phase 3 — Production essentials (Docker, PM2)
-- [ ] Phase 4 — Databases
+- [x] Phase 4 — Databases
 - [ ] Phase 5 — More frameworks and options
 - [ ] Phase 6 — Advanced options
 - [ ] Phase 7 — Polish and release
