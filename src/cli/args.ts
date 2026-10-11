@@ -11,6 +11,18 @@ export const args = {
   'name': { type: 'positional', required: false, description: 'Project name and directory' },
   'yes': { type: 'boolean', alias: 'y', description: 'Skip prompts and use the defaults' },
   'force': { type: 'boolean', description: 'Write into a non-empty directory' },
+  'preset': {
+    type: 'string',
+    description: 'minimal, api or full, or a path to a JSON preset file. Flags override it.',
+  },
+  'dry-run': {
+    type: 'boolean',
+    description: 'Print the files and package.json that would be generated, without writing',
+  },
+  'latest': {
+    type: 'boolean',
+    description: 'Use the latest npm versions instead of the tested pins (not verified)',
+  },
   'framework': { type: 'enum', options: options(shape.framework), description: 'Web framework' },
   'db': { type: 'enum', options: options(shape.db), description: 'Database / ORM' },
   'pm': { type: 'enum', options: options(shape.packageManager), description: 'Package manager' },

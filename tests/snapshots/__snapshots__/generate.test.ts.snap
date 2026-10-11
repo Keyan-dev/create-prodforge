@@ -6817,6 +6817,276 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
 "
 `;
 
+exports[`generated project > --preset full file tree 1`] = `
+{
+  "features": [
+    "base",
+    "framework-express",
+    "db-prisma",
+    "example-users",
+    "openapi",
+    "cache-redis",
+    "queue-bullmq",
+    "otel",
+    "auth-better-auth",
+    "testing-vitest",
+    "lint-eslint",
+    "git-hooks",
+    "ci-github",
+    "docker",
+    "pm2",
+  ],
+  "files": [
+    ".dockerignore",
+    ".editorconfig",
+    ".env.example",
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    ".husky/commit-msg",
+    ".husky/pre-commit",
+    ".nvmrc",
+    ".prettierignore",
+    ".prettierrc.json",
+    "Dockerfile",
+    "README.md",
+    "commitlint.config.js",
+    "compose.yaml",
+    "ecosystem.config.cjs",
+    "eslint.config.js",
+    "package.json",
+    "prisma.config.ts",
+    "prisma/migrations/20261010000000_init/migration.sql",
+    "prisma/migrations/20261011000000_auth/migration.sql",
+    "prisma/migrations/migration_lock.toml",
+    "prisma/schema.prisma",
+    "src/app.ts",
+    "src/config/env.ts",
+    "src/db/auth-adapter.ts",
+    "src/db/client.ts",
+    "src/instrumentation.ts",
+    "src/jobs/connection.ts",
+    "src/jobs/example.job.ts",
+    "src/lib/auth.ts",
+    "src/lib/logger.ts",
+    "src/lib/readiness.ts",
+    "src/lib/redis.ts",
+    "src/middleware/error-handler.ts",
+    "src/modules/auth/auth.routes.ts",
+    "src/modules/docs/docs.routes.ts",
+    "src/modules/health/health.routes.ts",
+    "src/modules/users/users.openapi.ts",
+    "src/modules/users/users.repository.ts",
+    "src/modules/users/users.routes.ts",
+    "src/modules/users/users.schema.ts",
+    "src/openapi/docs-page.ts",
+    "src/openapi/document.ts",
+    "src/openapi/schemas.ts",
+    "src/server.ts",
+    "src/worker.ts",
+    "tests/app.test.ts",
+    "tests/auth.test.ts",
+    "tests/docs.test.ts",
+    "tests/example.job.test.ts",
+    "tests/health.test.ts",
+    "tests/support/memory-users-repository.ts",
+    "tests/users.test.ts",
+    "tsconfig.json",
+    "tsdown.config.ts",
+    "vitest.config.ts",
+  ],
+}
+`;
+
+exports[`generated project > --preset full file tree 2`] = `
+"{
+  "name": "my-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "build": "tsdown",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "dev": "tsx watch --import ./src/instrumentation.ts --env-file-if-exists=.env src/server.ts",
+    "dev:worker": "tsx watch --import ./src/instrumentation.ts --env-file-if-exists=.env src/worker.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "postinstall": "prisma generate",
+    "prepare": "husky",
+    "start": "node --import ./dist/instrumentation.js --env-file-if-exists=.env dist/server.js",
+    "start:worker": "node --import ./dist/instrumentation.js --env-file-if-exists=.env dist/worker.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opentelemetry/auto-instrumentations-node": "^0.81.0",
+    "@opentelemetry/instrumentation": "^0.223.0",
+    "@opentelemetry/sdk-node": "^0.223.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "@scalar/express-api-reference": "^0.10.28",
+    "better-auth": "^1.7.7",
+    "bullmq": "^6.3.12",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "zod": "^4.6.5",
+    "zod-openapi": "^6.0.2"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "pino-pretty": "^13.2.0",
+    "prettier": "^3.9.10",
+    "prisma": "^7.10.0",
+    "supertest": "^7.3.1",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,yml,yaml}": "prettier --write"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
+    ]
+  }
+}
+"
+`;
+
+exports[`generated project > --preset minimal file tree 1`] = `
+{
+  "features": [
+    "base",
+    "framework-express",
+    "testing-vitest",
+    "lint-eslint",
+    "docker",
+  ],
+  "files": [
+    ".dockerignore",
+    ".editorconfig",
+    ".env.example",
+    ".gitignore",
+    ".nvmrc",
+    ".prettierignore",
+    ".prettierrc.json",
+    "Dockerfile",
+    "README.md",
+    "compose.yaml",
+    "eslint.config.js",
+    "package.json",
+    "src/app.ts",
+    "src/config/env.ts",
+    "src/lib/logger.ts",
+    "src/lib/readiness.ts",
+    "src/middleware/error-handler.ts",
+    "src/modules/health/health.routes.ts",
+    "src/server.ts",
+    "tests/app.test.ts",
+    "tests/health.test.ts",
+    "tsconfig.json",
+    "tsdown.config.ts",
+    "vitest.config.ts",
+  ],
+}
+`;
+
+exports[`generated project > --preset minimal file tree 2`] = `
+"{
+  "name": "my-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "helmet": "^8.3.0",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/supertest": "^7.2.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "pino-pretty": "^13.2.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.3.1",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
+"
+`;
+
 exports[`generated project > --yes defaults (express, vitest, eslint, pnpm, node 24) 1`] = `
 {
   "features": [

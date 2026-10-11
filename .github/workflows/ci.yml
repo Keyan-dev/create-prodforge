@@ -28,16 +28,13 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      - name: Smoke test the built CLI
-        run: |
-          test "$(node dist/index.js --version)" = "$(node -p 'require("./package.json").version')"
-          cd "$RUNNER_TEMP" && node "$GITHUB_WORKSPACE/dist/index.js" smoke-app --yes --no-install --no-git
-          test -f smoke-app/src/app.ts && test -f smoke-app/.gitignore
+      - name: Smoke test the packed CLI
+        run: scripts/smoke-pack.sh
 
   e2e:
     # Generate → install → lint/test/build/run for real (PLAN.md §6): every framework × database
     # with ESLint, plus Biome and the add-ons (extra flags) on a few of them. One job per case.
-    name: e2e (${{ matrix.framework }}, ${{ matrix.db }}, ${{ matrix.lint }}${{ matrix.extra && format(', {0}', matrix.extra) || '' }})
+    name: e2e (${{ matrix.framework }}, ${{ matrix.db }}, ${{ matrix.lint }}${{ matrix.extra && format(', {0}', matrix.extra) || '' }}${{ matrix.add && format(', add {0}', matrix.add) || '' }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -57,11 +54,17 @@ jobs:
           - { framework: fastify, db: drizzle, lint: eslint, extra: '--auth better-auth' }
           - { framework: express, db: mongoose, lint: biome, extra: '--auth better-auth' }
           - { framework: hono, db: prisma, lint: eslint, extra: '--auth better-auth' }
+          - { framework: express, db: prisma, lint: eslint, extra: '--preset full' }
+          - { framework: express, db: none, lint: eslint, extra: '--preset minimal' }
+          # create-prodforge add on a generated project, then every check on the result.
+          - { framework: fastify, db: prisma, lint: eslint, extra: '', add: 'bullmq jwt otel' }
+          - { framework: hono, db: drizzle, lint: biome, extra: '', add: 'better-auth' }
     env:
       PRODFORGE_E2E_FRAMEWORK: ${{ matrix.framework }}
       PRODFORGE_E2E_DB: ${{ matrix.db }}
       PRODFORGE_E2E_LINT: ${{ matrix.lint }}
       PRODFORGE_E2E_FLAGS: ${{ matrix.extra }}
+      PRODFORGE_E2E_ADD: ${{ matrix.add }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4

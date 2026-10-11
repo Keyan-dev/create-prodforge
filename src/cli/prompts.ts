@@ -19,11 +19,11 @@ const EXTRAS = [
   { value: 'pm2', label: 'PM2', hint: 'cluster mode config' },
   { value: 'ci', label: 'GitHub Actions CI' },
   { value: 'gitHooks', label: 'Git hooks', hint: 'Husky, lint-staged, commitlint' },
+  { value: 'otel', label: 'OpenTelemetry', hint: 'traces for HTTP and database calls' },
 ] as const satisfies { value: keyof ProjectConfigInput; label: string; hint?: string }[];
 
 /**
- * Ask for whatever the flags didn't settle. Only options that a feature implements today are
- * asked about; the rest keep their defaults (see availability.ts).
+ * Ask for whatever the flags and preset didn't settle.
  */
 export async function promptForMissing(
   given: Partial<ProjectConfigInput>,
@@ -84,14 +84,46 @@ export async function promptForMissing(
     );
   }
 
-  // Extras the flags didn't settle, all on by default.
+  if (answers.cache === undefined) {
+    answers.cache = unwrap(
+      await p.select({
+        message: 'Redis',
+        initialValue: 'none' as const,
+        options: [
+          { value: 'none', label: 'None' },
+          { value: 'redis', label: 'Redis', hint: 'a shared connection for caching' },
+          { value: 'bullmq', label: 'Redis + BullMQ', hint: 'plus background jobs in a worker' },
+        ],
+      }),
+    );
+  }
+  // Auth stores accounts in the database, so there's nothing to ask without one.
+  if (answers.auth === undefined && answers.db !== 'none') {
+    answers.auth = unwrap(
+      await p.select({
+        message: 'Authentication',
+        initialValue: 'none' as const,
+        options: [
+          { value: 'none', label: 'None' },
+          { value: 'jwt', label: 'JWT', hint: 'access and refresh tokens' },
+          {
+            value: 'better-auth',
+            label: 'Better Auth',
+            hint: 'sessions, cookies and bearer tokens',
+          },
+        ],
+      }),
+    );
+  }
+
+  // Extras the flags didn't settle, on by default except OpenTelemetry.
   const extras = EXTRAS.filter(({ value }) => answers[value] === undefined);
   if (extras.length) {
     const chosen = unwrap(
       await p.multiselect({
         message: 'Extras',
         options: extras,
-        initialValues: extras.map(({ value }) => value),
+        initialValues: extras.map(({ value }) => value).filter((value) => value !== 'otel'),
         required: false,
       }),
     );

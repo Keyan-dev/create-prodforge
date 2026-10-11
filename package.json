@@ -1,17 +1,32 @@
 {
   "name": "create-prodforge",
   "version": "0.0.0",
-  "description": "Scaffold production-ready Node.js + TypeScript backends.",
+  "description": "Scaffold production-ready Node.js + TypeScript backends: Express, Fastify or Hono, Prisma, Drizzle or Mongoose, Docker, PM2, CI, auth, Redis and OpenTelemetry.",
   "keywords": [
     "create",
+    "create-app",
     "scaffold",
+    "generator",
     "cli",
+    "template",
     "typescript",
+    "node",
     "backend",
-    "node"
+    "api",
+    "express",
+    "fastify",
+    "hono",
+    "prisma",
+    "drizzle",
+    "mongoose",
+    "docker"
   ],
   "license": "MIT",
   "author": "Keyan",
+  "homepage": "https://github.com/Keyan-dev/create-prodforge#readme",
+  "bugs": {
+    "url": "https://github.com/Keyan-dev/create-prodforge/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Keyan-dev/create-prodforge.git"
@@ -23,6 +38,9 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=24"
   },

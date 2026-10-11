@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { parseConfig, type ProjectConfigInput } from '../../src/core/config';
 import { generate } from '../../src/core/pipeline';
+import { presets } from '../../src/core/presets';
 import { features } from '../../src/features';
 
 async function snapshot(input: ProjectConfigInput) {
@@ -205,6 +206,12 @@ describe('generated project', () => {
   it('--auth needs a database', async () => {
     const { features: ran } = await snapshot({ name: 'my-api', auth: 'jwt', db: 'none' });
     expect(ran).not.toContain('auth-jwt');
+  });
+
+  it.each(['minimal', 'full'] as const)('--preset %s file tree', async (preset) => {
+    const { files, features: ran } = await snapshot({ name: 'my-api', ...presets[preset] });
+    expect({ features: ran, files: Object.keys(files).sort() }).toMatchSnapshot();
+    expect(files['package.json']).toMatchSnapshot();
   });
 
   it('without git hooks', async () => {

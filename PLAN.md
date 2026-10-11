@@ -223,6 +223,7 @@ Each phase is one or two AI sessions. **Done when** describes the acceptance che
 
 ### Phase 8 (post-v1) — `prodforge add <feature>`
 - Add features to an existing generated project by re-running the feature modules against the real FS, using a `.prodforge.json` that records the original config
+- Shipped as `create-prodforge add <add-on...>` (see `docs/decisions.md`)
 
 ---
 
@@ -240,8 +241,9 @@ Each phase is one or two AI sessions. **Done when** describes the acceptance che
 - [x] Phase 3 — Production essentials (Docker, PM2)
 - [x] Phase 4 — Databases
 - [x] Phase 5 — More frameworks and options
-- [ ] Phase 6 — Advanced options
-- [ ] Phase 7 — Polish and release
+- [x] Phase 6 — Advanced options
+- [ ] Phase 7 — Polish and release (everything but the npm publish is done; it's ticked once `npm create prodforge@latest` works from the registry)
+- [x] Phase 8 — `create-prodforge add <feature>`
 
 ---
 
