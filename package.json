@@ -1,6 +1,6 @@
 {
   "name": "create-prodforge",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Scaffold production-ready Node.js + TypeScript backends: Express, Fastify or Hono, Prisma, Drizzle or Mongoose, Docker, PM2, CI, auth, Redis and OpenTelemetry.",
   "keywords": [
     "create",
