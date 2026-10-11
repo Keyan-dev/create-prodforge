@@ -10,7 +10,7 @@ export function unavailable(cfg: ProjectConfig): { blocking: string[]; skipped: 
 
   const skipped = [
     cfg.example && cfg.db === 'none' && 'example module (it needs a database)',
-    cfg.auth !== 'none' && `auth (${cfg.auth})`,
+    cfg.auth !== 'none' && cfg.db === 'none' && `auth (it needs a database)`,
     cfg.docker && !dockerSupports(cfg.packageManager) && `Docker (with ${cfg.packageManager})`,
   ].filter((item): item is string => Boolean(item));
 

@@ -1,6 +1,7 @@
 import type { Feature } from '../../core/feature';
 import { featureFiles } from '../../core/templates';
 import { pick } from '../../core/versions';
+import { hasAuth } from '../shared/auth';
 import { addHttpEnv, hasUsersExample } from '../shared/http';
 
 /**
@@ -29,6 +30,32 @@ export const frameworkHono: Feature = {
         "import { docsRoutes } from './modules/docs/docs.routes';",
       );
       ctx.inject('src/app.ts', 'routes', "app.route('/', docsRoutes);");
+    }
+
+    // Auth routes and tests (see the auth-jwt feature).
+    if (hasAuth(ctx, 'jwt')) {
+      await ctx.files.copyDir(featureFiles('framework-hono', 'files-auth-jwt'));
+      ctx.inject(
+        'src/app.ts',
+        'imports',
+        "import { authRoutes } from './modules/auth/auth.routes';",
+      );
+      ctx.inject('src/app.ts', 'routes', "app.route('/auth', authRoutes);");
+    }
+
+    // Better Auth's handler, an example protected route and tests (see auth-better-auth).
+    if (hasAuth(ctx, 'better-auth')) {
+      await ctx.files.copyDir(featureFiles('framework-hono', 'files-auth-better-auth'));
+      ctx.inject(
+        'src/app.ts',
+        'imports',
+        "import { authRoutes, betterAuthRoutes } from './modules/auth/auth.routes';",
+      );
+      ctx.inject(
+        'src/app.ts',
+        'routes',
+        "app.route('/', betterAuthRoutes);\napp.route('/auth', authRoutes);",
+      );
     }
 
     // Routes and tests for the example users module (see the example-users feature).

@@ -8,6 +8,8 @@ import { exampleUsers } from './example-users';
 import { frameworkExpress } from './framework-express';
 import { frameworkFastify } from './framework-fastify';
 import { frameworkHono } from './framework-hono';
+import { authBetterAuth } from './auth-better-auth';
+import { authJwt } from './auth-jwt';
 import { cacheRedis } from './cache-redis';
 import { ciGithub } from './ci-github';
 import { gitHooks } from './git-hooks';
@@ -33,6 +35,8 @@ export const features: Feature[] = [
   cacheRedis,
   queueBullmq,
   otel,
+  authJwt,
+  authBetterAuth,
   testingVitest,
   lintEslint,
   lintBiome,

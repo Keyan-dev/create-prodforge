@@ -20,6 +20,19 @@ export const dbMongoose: Feature = {
 
     await ctx.files.copyDir(featureFiles('db-mongoose'));
     if (ctx.cfg.example) await ctx.files.copyDir(featureFiles('db-mongoose', 'files-example'));
+    if (ctx.cfg.auth !== 'none') {
+      await ctx.files.copyDir(featureFiles('db-mongoose', `files-auth-${ctx.cfg.auth}`));
+    }
+    if (ctx.cfg.auth === 'better-auth') {
+      // Better Auth's MongoDB adapter uses the driver directly; same version as Mongoose's.
+      ctx.pkg.addDeps(pick('mongodb'));
+      ctx.inject(
+        'src/server.ts',
+        'imports',
+        "import { closeAuthDatabase } from './db/auth-adapter';",
+      );
+      ctx.inject('src/server.ts', 'shutdown', 'await closeAuthDatabase();');
+    }
 
     readmeSetup(ctx, 'mongo');
     ctx.inject(

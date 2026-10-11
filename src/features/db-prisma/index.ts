@@ -36,6 +36,9 @@ export const dbPrisma: Feature = {
 
     await ctx.files.copyDir(featureFiles('db-prisma'), '.', { example: cfg.example });
     if (cfg.example) await ctx.files.copyDir(featureFiles('db-prisma', 'files-example'));
+    if (cfg.auth !== 'none') {
+      await ctx.files.copyDir(featureFiles('db-prisma', `files-auth-${cfg.auth}`));
+    }
 
     ctx.inject('.gitignore', 'ignore', '/src/generated/');
     // The image generates its own client; a stale local one must not overwrite it.

@@ -1,5 +1,3427 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`generated project > --auth better-auth with drizzle and hono 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
+
+# Database connection string
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+
+# Signs sessions; at least 32 characters (openssl rand -base64 48)
+BETTER_AUTH_SECRET=change-me-to-a-long-random-string-of-32-chars-or-more
+
+# Public base URL of this API
+BETTER_AUTH_URL=http://localhost:3000
+",
+  "drizzle/0000_init.sql": "CREATE TABLE "users" (
+	"id" text PRIMARY KEY NOT NULL,
+	"email" text NOT NULL,
+	"name" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "users_email_unique" UNIQUE("email")
+);
+",
+  "drizzle/0001_auth.sql": "CREATE TABLE "auth_account" (
+	"id" text PRIMARY KEY NOT NULL,
+	"account_id" text NOT NULL,
+	"provider_id" text NOT NULL,
+	"user_id" text NOT NULL,
+	"access_token" text,
+	"refresh_token" text,
+	"id_token" text,
+	"access_token_expires_at" timestamp,
+	"refresh_token_expires_at" timestamp,
+	"scope" text,
+	"password" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "auth_session" (
+	"id" text PRIMARY KEY NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"token" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp NOT NULL,
+	"ip_address" text,
+	"user_agent" text,
+	"user_id" text NOT NULL,
+	CONSTRAINT "auth_session_token_unique" UNIQUE("token")
+);
+--> statement-breakpoint
+CREATE TABLE "auth_user" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"email" text NOT NULL,
+	"email_verified" boolean DEFAULT false NOT NULL,
+	"image" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "auth_user_email_unique" UNIQUE("email")
+);
+--> statement-breakpoint
+CREATE TABLE "auth_verification" (
+	"id" text PRIMARY KEY NOT NULL,
+	"identifier" text NOT NULL,
+	"value" text NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+ALTER TABLE "auth_account" ADD CONSTRAINT "auth_account_user_id_auth_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."auth_user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "auth_session" ADD CONSTRAINT "auth_session_user_id_auth_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."auth_user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "authAccount_userId_idx" ON "auth_account" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "authSession_userId_idx" ON "auth_session" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "authVerification_identifier_idx" ON "auth_verification" USING btree ("identifier");",
+  "drizzle/meta/0000_snapshot.json": "{
+  "id": "6a73b831-ddd7-4a35-90aa-2533ee0eb253",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
+",
+  "drizzle/meta/0001_snapshot.json": "{
+  "id": "6100602c-bf6b-49c6-b75f-c4c5347a1c56",
+  "prevId": "6a73b831-ddd7-4a35-90aa-2533ee0eb253",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.auth_account": {
+      "name": "auth_account",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_token": {
+          "name": "access_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token": {
+          "name": "refresh_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "id_token": {
+          "name": "id_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "access_token_expires_at": {
+          "name": "access_token_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refresh_token_expires_at": {
+          "name": "refresh_token_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "authAccount_userId_idx": {
+          "name": "authAccount_userId_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auth_account_user_id_auth_user_id_fk": {
+          "name": "auth_account_user_id_auth_user_id_fk",
+          "tableFrom": "auth_account",
+          "tableTo": "auth_user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.auth_session": {
+      "name": "auth_session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "authSession_userId_idx": {
+          "name": "authSession_userId_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auth_session_user_id_auth_user_id_fk": {
+          "name": "auth_session_user_id_auth_user_id_fk",
+          "tableFrom": "auth_session",
+          "tableTo": "auth_user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "auth_session_token_unique": {
+          "name": "auth_session_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.auth_user": {
+      "name": "auth_user",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email_verified": {
+          "name": "email_verified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "auth_user_email_unique": {
+          "name": "auth_user_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.auth_verification": {
+      "name": "auth_verification",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "authVerification_identifier_idx": {
+          "name": "authVerification_identifier_idx",
+          "columns": [
+            {
+              "expression": "identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}",
+  "drizzle/meta/_journal.json": "{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791661440873,
+      "tag": "0000_init",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791703413409,
+      "tag": "0001_auth",
+      "breakpoints": true
+    }
+  ]
+}
+",
+  "src/app.ts": "import { bodyLimit } from 'hono/body-limit';
+import { cors } from 'hono/cors';
+import { HTTPException } from 'hono/http-exception';
+import { requestId } from 'hono/request-id';
+import { secureHeaders } from 'hono/secure-headers';
+import { rateLimiter } from 'hono-rate-limiter';
+import { env } from './config/env';
+import { type AppEnv, createRouter } from './lib/hono';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { requestLogger } from './middleware/request-logger';
+import { healthRoutes } from './modules/health/health.routes';
+import { docsRoutes } from './modules/docs/docs.routes';
+import { authRoutes, betterAuthRoutes } from './modules/auth/auth.routes';
+import { usersRoutes } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it with \`app.request()\`. */
+export function createApp() {
+  const app = createRouter();
+
+  // Reuses an incoming X-Request-Id (from a proxy) or creates one, and echoes it back.
+  app.use(requestId());
+  app.use(requestLogger);
+  app.use(secureHeaders());
+  // Health checks stay outside CORS and rate limiting.
+  app.route('/', healthRoutes);
+
+  app.use(cors({ origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') }));
+  app.use(
+    rateLimiter<AppEnv>({
+      windowMs: 60_000,
+      limit: env.RATE_LIMIT_PER_MINUTE,
+      standardHeaders: 'draft-7',
+      // c.env is the Node request under @hono/node-server; app.request() in tests has none.
+      keyGenerator: (c) =>
+        (c.env as AppEnv['Bindings'] | undefined)?.incoming.socket.remoteAddress ?? 'unknown',
+    }),
+  );
+  app.use(
+    bodyLimit({
+      maxSize: env.BODY_LIMIT_KB * 1024,
+      onError: () => {
+        throw new HTTPException(413, { message: 'Request body too large' });
+      },
+    }),
+  );
+
+  app.route('/', docsRoutes);
+  app.route('/', betterAuthRoutes);
+  app.route('/auth', authRoutes);
+  app.route('/users', usersRoutes);
+  app.notFound(notFound);
+  app.onError(errorHandler);
+
+  return app;
+}
+",
+  "src/db/auth-adapter.ts": "import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { db } from './client';
+import * as schema from './schema';
+
+/** Better Auth stores its users, sessions and accounts through Drizzle (the auth* tables). */
+export const authDatabase = drizzleAdapter(db, { provider: 'pg', schema });
+",
+  "src/db/schema.ts": "import { randomUUID } from 'node:crypto';
+import { relations } from 'drizzle-orm';
+import { boolean, index, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+
+export const users = pgTable('users', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => randomUUID()),
+  email: text('email').notNull().unique(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+// Better Auth tables (src/lib/auth.ts). Generated by the Better Auth CLI; keep them in sync
+// with its schema when you add plugins.
+export const authUser = pgTable('auth_user', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').default(false).notNull(),
+  image: text('image'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
+export const authSession = pgTable(
+  'auth_session',
+  {
+    id: text('id').primaryKey(),
+    expiresAt: timestamp('expires_at').notNull(),
+    token: text('token').notNull().unique(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .$onUpdate(() => new Date())
+      .notNull(),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    userId: text('user_id')
+      .notNull()
+      .references(() => authUser.id, { onDelete: 'cascade' }),
+  },
+  (table) => [index('authSession_userId_idx').on(table.userId)],
+);
+
+export const authAccount = pgTable(
+  'auth_account',
+  {
+    id: text('id').primaryKey(),
+    accountId: text('account_id').notNull(),
+    providerId: text('provider_id').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => authUser.id, { onDelete: 'cascade' }),
+    accessToken: text('access_token'),
+    refreshToken: text('refresh_token'),
+    idToken: text('id_token'),
+    accessTokenExpiresAt: timestamp('access_token_expires_at'),
+    refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
+    scope: text('scope'),
+    password: text('password'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index('authAccount_userId_idx').on(table.userId)],
+);
+
+export const authVerification = pgTable(
+  'auth_verification',
+  {
+    id: text('id').primaryKey(),
+    identifier: text('identifier').notNull(),
+    value: text('value').notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index('authVerification_identifier_idx').on(table.identifier)],
+);
+
+export const authUserRelations = relations(authUser, ({ many }) => ({
+  authSessions: many(authSession),
+  authAccounts: many(authAccount),
+}));
+
+export const authSessionRelations = relations(authSession, ({ one }) => ({
+  authUser: one(authUser, { fields: [authSession.userId], references: [authUser.id] }),
+}));
+
+export const authAccountRelations = relations(authAccount, ({ one }) => ({
+  authUser: one(authUser, { fields: [authAccount.userId], references: [authUser.id] }),
+}));
+",
+  "src/lib/auth.ts": "import { betterAuth } from 'better-auth';
+import { bearer } from 'better-auth/plugins';
+import { env } from '../config/env';
+import { authDatabase } from '../db/auth-adapter';
+
+/**
+ * Better Auth: email and password sign-up and sign-in with database sessions, served under
+ * /api/auth (e.g. POST /api/auth/sign-up/email, POST /api/auth/sign-in/email,
+ * GET /api/auth/get-session). Sessions work as a cookie, or as \`Authorization: Bearer <token>\`
+ * with the token from the \`set-auth-token\` response header (the bearer plugin).
+ * Add social providers and plugins here: https://www.better-auth.com/docs
+ */
+export const auth = betterAuth({
+  database: authDatabase,
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  basePath: '/api/auth',
+  trustedOrigins: env.CORS_ORIGIN === '*' ? [] : env.CORS_ORIGIN.split(','),
+  emailAndPassword: { enabled: true },
+  plugins: [bearer()],
+  // Prefixed so they never clash with your own users table or model.
+  user: { modelName: 'authUser' },
+  session: { modelName: 'authSession' },
+  account: { modelName: 'authAccount' },
+  verification: { modelName: 'authVerification' },
+});
+",
+  "src/modules/auth/auth.routes.ts": "import { HTTPException } from 'hono/http-exception';
+import { createMiddleware } from 'hono/factory';
+import { auth } from '../../lib/auth';
+import { type AppEnv, createRouter } from '../../lib/hono';
+
+type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
+
+/** Rejects a request without a valid session (401); the session is in \`c.get('session')\`. */
+export const requireSession = createMiddleware<AppEnv & { Variables: { session: Session } }>(
+  async (c, next) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) throw new HTTPException(401, { message: 'Authentication required' });
+    c.set('session', session);
+    await next();
+  },
+);
+
+/** Better Auth's own routes under /api/auth (sign-up, sign-in, sessions, …). */
+export const betterAuthRoutes = createRouter().on(['GET', 'POST'], '/api/auth/*', (c) =>
+  auth.handler(c.req.raw),
+);
+
+/** An example protected route: the signed-in user. */
+export const authRoutes = createRouter().get('/me', requireSession, (c) =>
+  c.json(c.get('session').user),
+);
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "tests/auth.test.ts": "import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+// Signing up and in needs the database, so the e2e test covers it. These run without one.
+describe('auth', () => {
+  it('mounts Better Auth under /api/auth', async () => {
+    const response = await createApp().request('/api/auth/ok');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it('GET /auth/me requires a session', async () => {
+    expect((await createApp().request('/auth/me')).status).toBe(401);
+  });
+});
+",
+}
+`;
+
+exports[`generated project > --auth better-auth with mongoose and express 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
+
+# Database connection string
+DATABASE_URL=mongodb://localhost:27017/app
+
+# Signs sessions; at least 32 characters (openssl rand -base64 48)
+BETTER_AUTH_SECRET=change-me-to-a-long-random-string-of-32-chars-or-more
+
+# Public base URL of this API
+BETTER_AUTH_URL=http://localhost:3000
+",
+  "src/app.ts": "import { randomUUID } from 'node:crypto';
+import cors from 'cors';
+import express from 'express';
+import { rateLimit } from 'express-rate-limit';
+import helmet from 'helmet';
+import { pinoHttp } from 'pino-http';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { healthRouter } from './modules/health/health.routes';
+import { docsRouter } from './modules/docs/docs.routes';
+import { toNodeHandler } from 'better-auth/node';
+import { auth } from './lib/auth';
+import { authRouter } from './modules/auth/auth.routes';
+import { usersRouter } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it directly. */
+export function createApp() {
+  const app = express();
+
+  app.use(
+    pinoHttp({
+      logger,
+      // Reuse an incoming X-Request-Id (from a proxy) or create one, and echo it back.
+      genReqId: (req, res) => {
+        const id = req.headers['x-request-id']?.toString() || randomUUID();
+        res.setHeader('x-request-id', id);
+        return id;
+      },
+      autoLogging: { ignore: (req) => req.url === '/health' || req.url === '/ready' },
+    }),
+  );
+  app.use(helmet());
+  // Health checks stay outside CORS and rate limiting.
+  app.use(healthRouter);
+
+  app.use(cors({ origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') }));
+  app.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: env.RATE_LIMIT_PER_MINUTE,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+    }),
+  );
+  // Better Auth reads the raw body, so it goes before the JSON parser.
+  app.all('/api/auth/{*splat}', toNodeHandler(auth));
+  app.use(express.json({ limit: env.BODY_LIMIT_KB * 1024 }));
+
+  app.use(docsRouter);
+  app.use('/auth', authRouter);
+  app.use('/users', usersRouter);
+  app.use(notFound);
+  app.use(errorHandler);
+
+  return app;
+}
+",
+  "src/db/auth-adapter.ts": "import { mongodbAdapter } from 'better-auth/adapters/mongodb';
+import { MongoClient } from 'mongodb';
+import { env } from '../config/env';
+
+// Better Auth talks to MongoDB through the driver directly, with its own small pool. The client
+// connects on first use, so importing this needs no running database.
+const client = new MongoClient(env.DATABASE_URL);
+
+/**
+ * Better Auth stores its users, sessions and accounts in the auth* collections. Transactions need
+ * a replica set, which the compose \`mongo\` service isn't; turn them on if your server is one.
+ */
+export const authDatabase = mongodbAdapter(client.db(), { client, transaction: false });
+
+export async function closeAuthDatabase() {
+  await client.close();
+}
+",
+  "src/lib/auth.ts": "import { betterAuth } from 'better-auth';
+import { bearer } from 'better-auth/plugins';
+import { env } from '../config/env';
+import { authDatabase } from '../db/auth-adapter';
+
+/**
+ * Better Auth: email and password sign-up and sign-in with database sessions, served under
+ * /api/auth (e.g. POST /api/auth/sign-up/email, POST /api/auth/sign-in/email,
+ * GET /api/auth/get-session). Sessions work as a cookie, or as \`Authorization: Bearer <token>\`
+ * with the token from the \`set-auth-token\` response header (the bearer plugin).
+ * Add social providers and plugins here: https://www.better-auth.com/docs
+ */
+export const auth = betterAuth({
+  database: authDatabase,
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  basePath: '/api/auth',
+  trustedOrigins: env.CORS_ORIGIN === '*' ? [] : env.CORS_ORIGIN.split(','),
+  emailAndPassword: { enabled: true },
+  plugins: [bearer()],
+  // Prefixed so they never clash with your own users table or model.
+  user: { modelName: 'authUser' },
+  session: { modelName: 'authSession' },
+  account: { modelName: 'authAccount' },
+  verification: { modelName: 'authVerification' },
+});
+",
+  "src/modules/auth/auth.routes.ts": "import { fromNodeHeaders } from 'better-auth/node';
+import { type RequestHandler, Router } from 'express';
+import { auth } from '../../lib/auth';
+import { HttpError } from '../../middleware/error-handler';
+
+/** Rejects a request without a valid session (401); the session is in \`res.locals.session\`. */
+export const requireSession: RequestHandler = async (req, res, next) => {
+  const session = await auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
+  if (!session) throw new HttpError(401, 'Authentication required');
+  res.locals.session = session;
+  next();
+};
+
+/** An example protected route: the signed-in user. */
+export const authRouter = Router().get('/me', requireSession, (_req, res) => {
+  res.json(res.locals.session.user);
+});
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "tests/auth.test.ts": "import request from 'supertest';
+import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+// Signing up and in needs the database, so the e2e test covers it. These run without one.
+describe('auth', () => {
+  it('mounts Better Auth under /api/auth', async () => {
+    const response = await request(createApp()).get('/api/auth/ok');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ ok: true });
+  });
+
+  it('GET /auth/me requires a session', async () => {
+    expect((await request(createApp()).get('/auth/me')).status).toBe(401);
+  });
+});
+",
+}
+`;
+
+exports[`generated project > --auth better-auth with prisma and fastify 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
+
+# Database connection string
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+
+# Signs sessions; at least 32 characters (openssl rand -base64 48)
+BETTER_AUTH_SECRET=change-me-to-a-long-random-string-of-32-chars-or-more
+
+# Public base URL of this API
+BETTER_AUTH_URL=http://localhost:3000
+",
+  "prisma/migrations/20261010000000_init/migration.sql": "-- CreateTable
+CREATE TABLE "users" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+",
+  "prisma/migrations/20261011000000_auth/migration.sql": "-- CreateTable
+CREATE TABLE "auth_user" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "emailVerified" BOOLEAN NOT NULL DEFAULT false,
+    "image" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "auth_user_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "auth_session" (
+    "id" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "token" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "auth_session_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "auth_account" (
+    "id" TEXT NOT NULL,
+    "accountId" TEXT NOT NULL,
+    "providerId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "refreshToken" TEXT,
+    "idToken" TEXT,
+    "accessTokenExpiresAt" TIMESTAMP(3),
+    "refreshTokenExpiresAt" TIMESTAMP(3),
+    "scope" TEXT,
+    "password" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "auth_account_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "auth_verification" (
+    "id" TEXT NOT NULL,
+    "identifier" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "auth_verification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "auth_user_email_key" ON "auth_user"("email");
+
+-- CreateIndex
+CREATE INDEX "auth_session_userId_idx" ON "auth_session"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "auth_session_token_key" ON "auth_session"("token");
+
+-- CreateIndex
+CREATE INDEX "auth_account_userId_idx" ON "auth_account"("userId");
+
+-- CreateIndex
+CREATE INDEX "auth_verification_identifier_idx" ON "auth_verification"("identifier");
+
+-- AddForeignKey
+ALTER TABLE "auth_session" ADD CONSTRAINT "auth_session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "auth_user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "auth_account" ADD CONSTRAINT "auth_account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "auth_user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+",
+  "prisma/migrations/migration_lock.toml": "# Please do not edit this file manually
+# It should be added in your version-control system (e.g., Git)
+provider = "postgresql"
+",
+  "prisma/schema.prisma": "generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+// Better Auth models (src/lib/auth.ts). Generated by the Better Auth CLI; keep them in sync with
+// its schema when you add plugins.
+model AuthUser {
+  id            String        @id
+  name          String
+  email         String
+  emailVerified Boolean       @default(false)
+  image         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  authsessions  AuthSession[]
+  authaccounts  AuthAccount[]
+
+  @@unique([email])
+  @@map("auth_user")
+}
+
+model AuthSession {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  authuser  AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("auth_session")
+}
+
+model AuthAccount {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  authuser              AuthUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("auth_account")
+}
+
+model AuthVerification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("auth_verification")
+}
+",
+  "src/app.ts": "import { randomUUID } from 'node:crypto';
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import Fastify from 'fastify';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { healthRoutes } from './modules/health/health.routes';
+import { docsRoutes } from './modules/docs/docs.routes';
+import { authRoutes, betterAuthRoutes } from './modules/auth/auth.routes';
+import { usersRoutes } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it with \`app.inject()\`. */
+export function createApp() {
+  const app = Fastify({
+    loggerInstance: logger,
+    // Reuse an incoming X-Request-Id (from a proxy) or create one; it's echoed back below.
+    requestIdHeader: 'x-request-id',
+    genReqId: () => randomUUID(),
+    bodyLimit: env.BODY_LIMIT_KB * 1024,
+  });
+
+  app.addHook('onRequest', async (request, reply) => {
+    reply.header('x-request-id', request.id);
+  });
+  app.register(helmet);
+  app.register(cors, { origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') });
+  app.register(rateLimit, { max: env.RATE_LIMIT_PER_MINUTE, timeWindow: '1 minute' });
+
+  app.register(healthRoutes);
+  app.register(docsRoutes);
+  app.register(betterAuthRoutes);
+  app.register(authRoutes, { prefix: '/auth' });
+  app.register(usersRoutes, { prefix: '/users' });
+  app.setNotFoundHandler(notFound);
+  app.setErrorHandler(errorHandler);
+
+  return app;
+}
+",
+  "src/db/auth-adapter.ts": "import { prismaAdapter } from 'better-auth/adapters/prisma';
+import { prisma } from './client';
+
+/** Better Auth stores its users, sessions and accounts through Prisma (the Auth* models). */
+export const authDatabase = prismaAdapter(prisma, { provider: 'postgresql' });
+",
+  "src/lib/auth.ts": "import { betterAuth } from 'better-auth';
+import { bearer } from 'better-auth/plugins';
+import { env } from '../config/env';
+import { authDatabase } from '../db/auth-adapter';
+
+/**
+ * Better Auth: email and password sign-up and sign-in with database sessions, served under
+ * /api/auth (e.g. POST /api/auth/sign-up/email, POST /api/auth/sign-in/email,
+ * GET /api/auth/get-session). Sessions work as a cookie, or as \`Authorization: Bearer <token>\`
+ * with the token from the \`set-auth-token\` response header (the bearer plugin).
+ * Add social providers and plugins here: https://www.better-auth.com/docs
+ */
+export const auth = betterAuth({
+  database: authDatabase,
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  basePath: '/api/auth',
+  trustedOrigins: env.CORS_ORIGIN === '*' ? [] : env.CORS_ORIGIN.split(','),
+  emailAndPassword: { enabled: true },
+  plugins: [bearer()],
+  // Prefixed so they never clash with your own users table or model.
+  user: { modelName: 'authUser' },
+  session: { modelName: 'authSession' },
+  account: { modelName: 'authAccount' },
+  verification: { modelName: 'authVerification' },
+});
+",
+  "src/modules/auth/auth.routes.ts": "import { fromNodeHeaders } from 'better-auth/node';
+import type { FastifyPluginAsync, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
+import { auth } from '../../lib/auth';
+import { HttpError } from '../../middleware/error-handler';
+
+type Session = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>;
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    /** Set by \`requireSession\`. */
+    session?: Session;
+  }
+}
+
+/** Turn a Fastify request into the web \`Request\` Better Auth handles. */
+function toWebRequest(request: FastifyRequest) {
+  const url = new URL(request.url, \`\${request.protocol}://\${request.host}\`);
+  return new Request(url, {
+    method: request.method,
+    headers: fromNodeHeaders(request.headers),
+    ...(request.body !== undefined && { body: JSON.stringify(request.body) }),
+  });
+}
+
+/** Better Auth's own routes under /api/auth (sign-up, sign-in, sessions, …). */
+export const betterAuthRoutes: FastifyPluginAsync = async (app) => {
+  app.route({
+    method: ['GET', 'POST'],
+    url: '/api/auth/*',
+    async handler(request, reply) {
+      const response = await auth.handler(toWebRequest(request));
+      reply.status(response.status);
+      response.headers.forEach((value, key) => {
+        if (key !== 'set-cookie') reply.header(key, value);
+      });
+      const cookies = response.headers.getSetCookie();
+      if (cookies.length) reply.header('set-cookie', cookies);
+      return reply.send(response.body ? await response.text() : null);
+    },
+  });
+};
+
+/** Rejects a request without a valid session (401); the session is in \`request.session\`. */
+export const requireSession: preHandlerAsyncHookHandler = async (request) => {
+  const session = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) });
+  if (!session) throw new HttpError(401, 'Authentication required');
+  request.session = session;
+};
+
+/** An example protected route: the signed-in user. */
+export const authRoutes: FastifyPluginAsync = async (app) => {
+  app.get('/me', { preHandler: requireSession }, async (request) => request.session?.user);
+};
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "tests/auth.test.ts": "import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+// Signing up and in needs the database, so the e2e test covers it. These run without one.
+describe('auth', () => {
+  it('mounts Better Auth under /api/auth', async () => {
+    const response = await createApp().inject('/api/auth/ok');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true });
+  });
+
+  it('GET /auth/me requires a session', async () => {
+    expect((await createApp().inject('/auth/me')).statusCode).toBe(401);
+  });
+});
+",
+}
+`;
+
+exports[`generated project > --auth jwt documents its routes in OpenAPI 1`] = `
+"import { z } from 'zod';
+import { createDocument } from 'zod-openapi';
+import { json } from './schemas';
+import { usersPaths } from '../modules/users/users.openapi';
+import { authPaths } from '../modules/auth/auth.openapi';
+
+const ReadinessSchema = z.object({
+  ready: z.boolean(),
+  checks: z.record(z.string(), z.string()),
+});
+
+/**
+ * The OpenAPI 3.1 description of this API, built from Zod schemas. Served at /openapi.json and
+ * rendered at /docs. Add each new route's paths here.
+ */
+export const openApiDocument = createDocument({
+  openapi: '3.1.0',
+  info: { title: 'my-api', version: '0.1.0' },
+  paths: {
+    '/health': {
+      get: {
+        tags: ['health'],
+        summary: 'Liveness: the process is up',
+        responses: {
+          '200': { description: 'Up', content: json(z.object({ status: z.literal('ok') })) },
+        },
+      },
+    },
+    '/ready': {
+      get: {
+        tags: ['health'],
+        summary: 'Readiness: dependencies are reachable',
+        responses: {
+          '200': { description: 'Ready', content: json(ReadinessSchema) },
+          '503': { description: 'Not ready', content: json(ReadinessSchema) },
+        },
+      },
+    },
+    ...usersPaths,
+    ...authPaths,
+  },
+  components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } } },
+});
+"
+`;
+
+exports[`generated project > --auth jwt with drizzle and fastify 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
+
+# Database connection string
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+
+# Signs access and refresh tokens; at least 32 characters (openssl rand -base64 48)
+JWT_SECRET=change-me-to-a-long-random-string-of-32-chars-or-more
+
+# Access token lifetime
+JWT_ACCESS_TTL=15m
+
+# Refresh token lifetime
+JWT_REFRESH_TTL=7d
+",
+  "drizzle/0000_init.sql": "CREATE TABLE "users" (
+	"id" text PRIMARY KEY NOT NULL,
+	"email" text NOT NULL,
+	"name" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "users_email_unique" UNIQUE("email")
+);
+",
+  "drizzle/0001_auth.sql": "CREATE TABLE "accounts" (
+	"id" text PRIMARY KEY NOT NULL,
+	"email" text NOT NULL,
+	"password_hash" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "accounts_email_unique" UNIQUE("email")
+);
+",
+  "drizzle/meta/0000_snapshot.json": "{
+  "id": "6a73b831-ddd7-4a35-90aa-2533ee0eb253",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
+",
+  "drizzle/meta/0001_snapshot.json": "{
+  "id": "046d1fa3-cbf2-4c46-8b8c-f90782dba7dc",
+  "prevId": "6a73b831-ddd7-4a35-90aa-2533ee0eb253",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.accounts": {
+      "name": "accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "accounts_email_unique": {
+          "name": "accounts_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}",
+  "drizzle/meta/_journal.json": "{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791661440873,
+      "tag": "0000_init",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791703413409,
+      "tag": "0001_auth",
+      "breakpoints": true
+    }
+  ]
+}
+",
+  "src/app.ts": "import { randomUUID } from 'node:crypto';
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import Fastify from 'fastify';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { healthRoutes } from './modules/health/health.routes';
+import { docsRoutes } from './modules/docs/docs.routes';
+import { authRoutes } from './modules/auth/auth.routes';
+import { usersRoutes } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it with \`app.inject()\`. */
+export function createApp() {
+  const app = Fastify({
+    loggerInstance: logger,
+    // Reuse an incoming X-Request-Id (from a proxy) or create one; it's echoed back below.
+    requestIdHeader: 'x-request-id',
+    genReqId: () => randomUUID(),
+    bodyLimit: env.BODY_LIMIT_KB * 1024,
+  });
+
+  app.addHook('onRequest', async (request, reply) => {
+    reply.header('x-request-id', request.id);
+  });
+  app.register(helmet);
+  app.register(cors, { origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') });
+  app.register(rateLimit, { max: env.RATE_LIMIT_PER_MINUTE, timeWindow: '1 minute' });
+
+  app.register(healthRoutes);
+  app.register(docsRoutes);
+  app.register(authRoutes, { prefix: '/auth' });
+  app.register(usersRoutes, { prefix: '/users' });
+  app.setNotFoundHandler(notFound);
+  app.setErrorHandler(errorHandler);
+
+  return app;
+}
+",
+  "src/db/schema.ts": "import { randomUUID } from 'node:crypto';
+import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+
+export const users = pgTable('users', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => randomUUID()),
+  email: text('email').notNull().unique(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** Login credentials for JWT auth (src/modules/auth). */
+export const accounts = pgTable('accounts', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => randomUUID()),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+",
+  "src/lib/jwt.ts": "import { jwtVerify, SignJWT } from 'jose';
+import { env } from '../config/env';
+
+const secret = new TextEncoder().encode(env.JWT_SECRET);
+const ISSUER = 'api';
+
+export type TokenType = 'access' | 'refresh';
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: 'Bearer';
+  expiresIn: string;
+}
+
+/** Sign a short-lived access token or a longer-lived refresh token for this account id. */
+function sign(subject: string, type: TokenType) {
+  return new SignJWT({ type })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(subject)
+    .setIssuer(ISSUER)
+    .setIssuedAt()
+    .setExpirationTime(type === 'access' ? env.JWT_ACCESS_TTL : env.JWT_REFRESH_TTL)
+    .sign(secret);
+}
+
+export async function issueTokens(subject: string): Promise<TokenPair> {
+  const [accessToken, refreshToken] = await Promise.all([
+    sign(subject, 'access'),
+    sign(subject, 'refresh'),
+  ]);
+  return { accessToken, refreshToken, tokenType: 'Bearer', expiresIn: env.JWT_ACCESS_TTL };
+}
+
+/** The account id in a valid token of this type, or null if it's invalid, expired or the wrong type. */
+export async function verifyToken(token: string, type: TokenType): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret, { issuer: ISSUER, algorithms: ['HS256'] });
+    return payload.type === type && payload.sub ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+",
+  "src/lib/password.ts": "import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
+
+const scryptAsync = promisify(scrypt) as (
+  password: string,
+  salt: Buffer,
+  keylen: number,
+) => Promise<Buffer>;
+
+const KEY_LENGTH = 64;
+
+/**
+ * Hash a password with scrypt (built into Node, no native dependency) and a random salt.
+ * The result stores both as \`scrypt$<salt>$<hash>\` in base64.
+ */
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  const hash = await scryptAsync(password, salt, KEY_LENGTH);
+  return \`scrypt$\${salt.toString('base64')}$\${hash.toString('base64')}\`;
+}
+
+/** Check a password against a stored hash, in constant time. */
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [scheme, salt, hash] = stored.split('$');
+  if (scheme !== 'scrypt' || !salt || !hash) return false;
+  const expected = Buffer.from(hash, 'base64');
+  const actual = await scryptAsync(password, Buffer.from(salt, 'base64'), expected.length);
+  return timingSafeEqual(actual, expected);
+}
+",
+  "src/modules/auth/auth.openapi.ts": "import { z } from 'zod';
+import type { ZodOpenApiOperationObject, ZodOpenApiPathsObject } from 'zod-openapi';
+import { errorResponse, json } from '../../openapi/schemas';
+import { CredentialsSchema, RefreshSchema } from './auth.schema';
+
+const TokensSchema = z
+  .object({
+    accessToken: z.string(),
+    refreshToken: z.string(),
+    tokenType: z.literal('Bearer'),
+    expiresIn: z.string(),
+  })
+  .meta({ id: 'Tokens' });
+
+const tokens = (description: string) => ({ description, content: json(TokensSchema) });
+const invalid = errorResponse('Invalid request body');
+const tagged = (operation: ZodOpenApiOperationObject) => ({ tags: ['auth'], ...operation });
+
+/** OpenAPI paths for the auth routes, added to the document in src/openapi/document.ts. */
+export const authPaths: ZodOpenApiPathsObject = {
+  '/auth/register': {
+    post: tagged({
+      summary: 'Create an account and get tokens',
+      requestBody: { content: json(CredentialsSchema) },
+      responses: {
+        '201': tokens('Registered'),
+        '400': invalid,
+        '409': errorResponse('Email already registered'),
+      },
+    }),
+  },
+  '/auth/login': {
+    post: tagged({
+      summary: 'Log in and get tokens',
+      requestBody: { content: json(CredentialsSchema) },
+      responses: {
+        '200': tokens('Logged in'),
+        '400': invalid,
+        '401': errorResponse('Wrong email or password'),
+      },
+    }),
+  },
+  '/auth/refresh': {
+    post: tagged({
+      summary: 'Exchange a refresh token for new tokens',
+      requestBody: { content: json(RefreshSchema) },
+      responses: { '200': tokens('New tokens'), '401': errorResponse('Invalid refresh token') },
+    }),
+  },
+  '/auth/me': {
+    get: tagged({
+      summary: 'The logged-in account',
+      security: [{ bearerAuth: [] }],
+      responses: {
+        '200': {
+          description: 'The account',
+          content: json(z.object({ id: z.string(), email: z.email() })),
+        },
+        '401': errorResponse('Missing or invalid access token'),
+      },
+    }),
+  },
+};
+",
+  "src/modules/auth/auth.repository.ts": "import { eq } from 'drizzle-orm';
+import { DatabaseError } from 'pg';
+import { db } from '../../db/client';
+import { accounts } from '../../db/schema';
+import { AccountExistsError, type AccountsRepository } from './auth.schema';
+
+/** 23505: unique_violation, here the email. Drizzle wraps driver errors, so check the cause too. */
+function isUniqueViolation(error: unknown) {
+  const cause = error instanceof Error && error.cause ? error.cause : error;
+  return cause instanceof DatabaseError && cause.code === '23505';
+}
+
+export const accountsRepository: AccountsRepository = {
+  async findByEmail(email) {
+    const [account] = await db.select().from(accounts).where(eq(accounts.email, email));
+    return account ?? null;
+  },
+
+  async findById(id) {
+    const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
+    return account ?? null;
+  },
+
+  async create(data) {
+    try {
+      const [account] = await db.insert(accounts).values(data).returning();
+      if (!account) throw new Error('Insert returned no row');
+      return account;
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new AccountExistsError();
+      throw error;
+    }
+  },
+};
+",
+  "src/modules/auth/auth.routes.ts": "import type { FastifyPluginAsync, preHandlerAsyncHookHandler } from 'fastify';
+import { CredentialsSchema, RefreshSchema } from './auth.schema';
+import { type AuthUser, authService } from './auth.service';
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    /** Set by \`requireAuth\`. */
+    user?: AuthUser;
+  }
+}
+
+/** Rejects a request without a valid access token (401); the account is in \`request.user\`. */
+export const requireAuth: preHandlerAsyncHookHandler = async (request) => {
+  request.user = await authService.authenticate(request.headers.authorization);
+};
+
+export const authRoutes: FastifyPluginAsync = async (app) => {
+  app.post('/register', async (request, reply) =>
+    reply.code(201).send(await authService.register(CredentialsSchema.parse(request.body))),
+  );
+  app.post('/login', async (request) => authService.login(CredentialsSchema.parse(request.body)));
+  app.post('/refresh', async (request) =>
+    authService.refresh(RefreshSchema.parse(request.body).refreshToken),
+  );
+  app.get('/me', { preHandler: requireAuth }, async (request) => request.user);
+};
+",
+  "src/modules/auth/auth.schema.ts": "import { z } from 'zod';
+
+/** Request body for registering and logging in. */
+export const CredentialsSchema = z.object({
+  email: z.email().toLowerCase(),
+  password: z.string().min(8).max(200),
+});
+
+/** Request body for exchanging a refresh token for new tokens. */
+export const RefreshSchema = z.object({ refreshToken: z.string().min(1) });
+
+export type Credentials = z.infer<typeof CredentialsSchema>;
+
+export interface Account {
+  id: string;
+  email: string;
+  passwordHash: string;
+  createdAt: Date;
+}
+
+/** Storage for accounts. \`auth.repository.ts\` implements it for the chosen database. */
+export interface AccountsRepository {
+  findByEmail(email: string): Promise<Account | null>;
+  findById(id: string): Promise<Account | null>;
+  /** Throws \`AccountExistsError\` if the email is already registered. */
+  create(data: { email: string; passwordHash: string }): Promise<Account>;
+}
+
+/** An auth failure the error handler sends with its status (401 or 409). */
+export class AuthError extends Error {
+  readonly expose = true;
+
+  constructor(
+    readonly status: 401 | 409,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+export class AccountExistsError extends AuthError {
+  constructor() {
+    super(409, 'An account with this email already exists');
+  }
+}
+",
+  "src/modules/auth/auth.service.ts": "import { issueTokens, verifyToken } from '../../lib/jwt';
+import { hashPassword, verifyPassword } from '../../lib/password';
+import { accountsRepository } from './auth.repository';
+import { AuthError, type Credentials } from './auth.schema';
+
+const invalidCredentials = () => new AuthError(401, 'Invalid email or password');
+
+/** Framework-independent auth logic; the routes only parse requests and send responses. */
+export const authService = {
+  async register({ email, password }: Credentials) {
+    const account = await accountsRepository.create({
+      email,
+      passwordHash: await hashPassword(password),
+    });
+    return issueTokens(account.id);
+  },
+
+  async login({ email, password }: Credentials) {
+    const account = await accountsRepository.findByEmail(email);
+    if (!account || !(await verifyPassword(password, account.passwordHash))) {
+      throw invalidCredentials();
+    }
+    return issueTokens(account.id);
+  },
+
+  /** Refresh tokens are stateless JWTs: valid until they expire (see the README). */
+  async refresh(refreshToken: string) {
+    const id = await verifyToken(refreshToken, 'refresh');
+    if (!id || !(await accountsRepository.findById(id))) {
+      throw new AuthError(401, 'Invalid refresh token');
+    }
+    return issueTokens(id);
+  },
+
+  /** The account behind an \`Authorization: Bearer <access token>\` header. */
+  async authenticate(authorization: string | undefined) {
+    const token = authorization?.match(/^Bearer (.+)$/i)?.[1];
+    const id = token && (await verifyToken(token, 'access'));
+    const account = id ? await accountsRepository.findById(id) : null;
+    if (!account) throw new AuthError(401, 'Authentication required');
+    return { id: account.id, email: account.email };
+  },
+};
+
+export type AuthUser = Awaited<ReturnType<typeof authService.authenticate>>;
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "tests/auth.test.ts": "import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app';
+import { memoryAccountsRepository } from './support/memory-accounts-repository';
+
+// The routes run against in-memory accounts, so these tests need no database.
+vi.mock('../src/modules/auth/auth.repository', async () => ({
+  accountsRepository: (await import('./support/memory-accounts-repository'))
+    .memoryAccountsRepository,
+}));
+
+interface Tokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+const ada = { email: 'ada@example.com', password: 'correct horse battery' };
+
+const app = createApp();
+
+async function send(method: string, path: string, body?: unknown, headers = {}) {
+  const response = await app.inject({
+    method: method as 'GET' | 'POST',
+    url: path,
+    headers,
+    ...(body !== undefined && { payload: body as object }),
+  });
+  return { status: response.statusCode, body: response.json() as unknown };
+}
+
+describe('auth', () => {
+  beforeEach(() => memoryAccountsRepository.reset());
+
+  it('registers, logs in, refreshes and reads the account', async () => {
+    const registered = await send('POST', '/auth/register', ada);
+    expect(registered.status).toBe(201);
+    expect(registered.body).toMatchObject({ tokenType: 'Bearer' });
+
+    const login = await send('POST', '/auth/login', ada);
+    expect(login.status).toBe(200);
+    const { accessToken, refreshToken } = login.body as Tokens;
+
+    const me = await send('GET', '/auth/me', undefined, { authorization: \`Bearer \${accessToken}\` });
+    expect(me.status).toBe(200);
+    expect(me.body).toMatchObject({ email: ada.email });
+
+    const refreshed = await send('POST', '/auth/refresh', { refreshToken });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body).toHaveProperty('accessToken');
+  });
+
+  it('rejects a wrong password, a duplicate email and bad input', async () => {
+    await send('POST', '/auth/register', ada);
+
+    expect((await send('POST', '/auth/login', { ...ada, password: 'wrong-password' })).status).toBe(
+      401,
+    );
+    expect((await send('POST', '/auth/register', ada)).status).toBe(409);
+    const invalid = await send('POST', '/auth/register', { email: 'nope', password: 'x' });
+    expect(invalid.status).toBe(400);
+  });
+
+  it('requires a valid access token', async () => {
+    const { body } = await send('POST', '/auth/register', ada);
+    const { refreshToken } = body as Tokens;
+
+    expect((await send('GET', '/auth/me')).status).toBe(401);
+    const forged = await send('GET', '/auth/me', undefined, { authorization: 'Bearer nope' });
+    expect(forged.status).toBe(401);
+    // A refresh token is not an access token.
+    const wrongType = { authorization: \`Bearer \${refreshToken}\` };
+    expect((await send('GET', '/auth/me', undefined, wrongType)).status).toBe(401);
+  });
+});
+",
+}
+`;
+
+exports[`generated project > --auth jwt with mongoose and hono 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
+
+# Database connection string
+DATABASE_URL=mongodb://localhost:27017/app
+
+# Signs access and refresh tokens; at least 32 characters (openssl rand -base64 48)
+JWT_SECRET=change-me-to-a-long-random-string-of-32-chars-or-more
+
+# Access token lifetime
+JWT_ACCESS_TTL=15m
+
+# Refresh token lifetime
+JWT_REFRESH_TTL=7d
+",
+  "src/app.ts": "import { bodyLimit } from 'hono/body-limit';
+import { cors } from 'hono/cors';
+import { HTTPException } from 'hono/http-exception';
+import { requestId } from 'hono/request-id';
+import { secureHeaders } from 'hono/secure-headers';
+import { rateLimiter } from 'hono-rate-limiter';
+import { env } from './config/env';
+import { type AppEnv, createRouter } from './lib/hono';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { requestLogger } from './middleware/request-logger';
+import { healthRoutes } from './modules/health/health.routes';
+import { docsRoutes } from './modules/docs/docs.routes';
+import { authRoutes } from './modules/auth/auth.routes';
+import { usersRoutes } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it with \`app.request()\`. */
+export function createApp() {
+  const app = createRouter();
+
+  // Reuses an incoming X-Request-Id (from a proxy) or creates one, and echoes it back.
+  app.use(requestId());
+  app.use(requestLogger);
+  app.use(secureHeaders());
+  // Health checks stay outside CORS and rate limiting.
+  app.route('/', healthRoutes);
+
+  app.use(cors({ origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') }));
+  app.use(
+    rateLimiter<AppEnv>({
+      windowMs: 60_000,
+      limit: env.RATE_LIMIT_PER_MINUTE,
+      standardHeaders: 'draft-7',
+      // c.env is the Node request under @hono/node-server; app.request() in tests has none.
+      keyGenerator: (c) =>
+        (c.env as AppEnv['Bindings'] | undefined)?.incoming.socket.remoteAddress ?? 'unknown',
+    }),
+  );
+  app.use(
+    bodyLimit({
+      maxSize: env.BODY_LIMIT_KB * 1024,
+      onError: () => {
+        throw new HTTPException(413, { message: 'Request body too large' });
+      },
+    }),
+  );
+
+  app.route('/', docsRoutes);
+  app.route('/auth', authRoutes);
+  app.route('/users', usersRoutes);
+  app.notFound(notFound);
+  app.onError(errorHandler);
+
+  return app;
+}
+",
+  "src/lib/jwt.ts": "import { jwtVerify, SignJWT } from 'jose';
+import { env } from '../config/env';
+
+const secret = new TextEncoder().encode(env.JWT_SECRET);
+const ISSUER = 'api';
+
+export type TokenType = 'access' | 'refresh';
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: 'Bearer';
+  expiresIn: string;
+}
+
+/** Sign a short-lived access token or a longer-lived refresh token for this account id. */
+function sign(subject: string, type: TokenType) {
+  return new SignJWT({ type })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(subject)
+    .setIssuer(ISSUER)
+    .setIssuedAt()
+    .setExpirationTime(type === 'access' ? env.JWT_ACCESS_TTL : env.JWT_REFRESH_TTL)
+    .sign(secret);
+}
+
+export async function issueTokens(subject: string): Promise<TokenPair> {
+  const [accessToken, refreshToken] = await Promise.all([
+    sign(subject, 'access'),
+    sign(subject, 'refresh'),
+  ]);
+  return { accessToken, refreshToken, tokenType: 'Bearer', expiresIn: env.JWT_ACCESS_TTL };
+}
+
+/** The account id in a valid token of this type, or null if it's invalid, expired or the wrong type. */
+export async function verifyToken(token: string, type: TokenType): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret, { issuer: ISSUER, algorithms: ['HS256'] });
+    return payload.type === type && payload.sub ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+",
+  "src/lib/password.ts": "import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
+
+const scryptAsync = promisify(scrypt) as (
+  password: string,
+  salt: Buffer,
+  keylen: number,
+) => Promise<Buffer>;
+
+const KEY_LENGTH = 64;
+
+/**
+ * Hash a password with scrypt (built into Node, no native dependency) and a random salt.
+ * The result stores both as \`scrypt$<salt>$<hash>\` in base64.
+ */
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  const hash = await scryptAsync(password, salt, KEY_LENGTH);
+  return \`scrypt$\${salt.toString('base64')}$\${hash.toString('base64')}\`;
+}
+
+/** Check a password against a stored hash, in constant time. */
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [scheme, salt, hash] = stored.split('$');
+  if (scheme !== 'scrypt' || !salt || !hash) return false;
+  const expected = Buffer.from(hash, 'base64');
+  const actual = await scryptAsync(password, Buffer.from(salt, 'base64'), expected.length);
+  return timingSafeEqual(actual, expected);
+}
+",
+  "src/modules/auth/auth.model.ts": "import { model, Schema } from 'mongoose';
+
+const accountSchema = new Schema(
+  {
+    email: { type: String, required: true, unique: true },
+    passwordHash: { type: String, required: true },
+  },
+  { timestamps: { createdAt: true, updatedAt: false } },
+);
+
+export const AccountModel = model('Account', accountSchema);
+",
+  "src/modules/auth/auth.openapi.ts": "import { z } from 'zod';
+import type { ZodOpenApiOperationObject, ZodOpenApiPathsObject } from 'zod-openapi';
+import { errorResponse, json } from '../../openapi/schemas';
+import { CredentialsSchema, RefreshSchema } from './auth.schema';
+
+const TokensSchema = z
+  .object({
+    accessToken: z.string(),
+    refreshToken: z.string(),
+    tokenType: z.literal('Bearer'),
+    expiresIn: z.string(),
+  })
+  .meta({ id: 'Tokens' });
+
+const tokens = (description: string) => ({ description, content: json(TokensSchema) });
+const invalid = errorResponse('Invalid request body');
+const tagged = (operation: ZodOpenApiOperationObject) => ({ tags: ['auth'], ...operation });
+
+/** OpenAPI paths for the auth routes, added to the document in src/openapi/document.ts. */
+export const authPaths: ZodOpenApiPathsObject = {
+  '/auth/register': {
+    post: tagged({
+      summary: 'Create an account and get tokens',
+      requestBody: { content: json(CredentialsSchema) },
+      responses: {
+        '201': tokens('Registered'),
+        '400': invalid,
+        '409': errorResponse('Email already registered'),
+      },
+    }),
+  },
+  '/auth/login': {
+    post: tagged({
+      summary: 'Log in and get tokens',
+      requestBody: { content: json(CredentialsSchema) },
+      responses: {
+        '200': tokens('Logged in'),
+        '400': invalid,
+        '401': errorResponse('Wrong email or password'),
+      },
+    }),
+  },
+  '/auth/refresh': {
+    post: tagged({
+      summary: 'Exchange a refresh token for new tokens',
+      requestBody: { content: json(RefreshSchema) },
+      responses: { '200': tokens('New tokens'), '401': errorResponse('Invalid refresh token') },
+    }),
+  },
+  '/auth/me': {
+    get: tagged({
+      summary: 'The logged-in account',
+      security: [{ bearerAuth: [] }],
+      responses: {
+        '200': {
+          description: 'The account',
+          content: json(z.object({ id: z.string(), email: z.email() })),
+        },
+        '401': errorResponse('Missing or invalid access token'),
+      },
+    }),
+  },
+};
+",
+  "src/modules/auth/auth.repository.ts": "import { isValidObjectId, mongo, type Types } from 'mongoose';
+import { AccountModel } from './auth.model';
+import { type Account, AccountExistsError, type AccountsRepository } from './auth.schema';
+
+interface AccountDocument {
+  _id: Types.ObjectId;
+  email: string;
+  passwordHash: string;
+  createdAt: Date;
+}
+
+function toAccount({ _id, email, passwordHash, createdAt }: AccountDocument): Account {
+  return { id: _id.toString(), email, passwordHash, createdAt };
+}
+
+export const accountsRepository: AccountsRepository = {
+  async findByEmail(email) {
+    const doc = await AccountModel.findOne({ email }).lean();
+    return doc && toAccount(doc);
+  },
+
+  async findById(id) {
+    if (!isValidObjectId(id)) return null;
+    const doc = await AccountModel.findById(id).lean();
+    return doc && toAccount(doc);
+  },
+
+  async create(data) {
+    try {
+      return toAccount((await AccountModel.create(data)).toObject());
+    } catch (error) {
+      // 11000: duplicate key, here the unique email index.
+      if (error instanceof mongo.MongoServerError && error.code === 11000) {
+        throw new AccountExistsError();
+      }
+      throw error;
+    }
+  },
+};
+",
+  "src/modules/auth/auth.routes.ts": "import { createMiddleware } from 'hono/factory';
+import { type AppEnv, createRouter } from '../../lib/hono';
+import { CredentialsSchema, RefreshSchema } from './auth.schema';
+import { type AuthUser, authService } from './auth.service';
+
+/** Rejects a request without a valid access token (401); the account is in \`c.get('user')\`. */
+export const requireAuth = createMiddleware<AppEnv & { Variables: { user: AuthUser } }>(
+  async (c, next) => {
+    c.set('user', await authService.authenticate(c.req.header('authorization')));
+    await next();
+  },
+);
+
+export const authRoutes = createRouter()
+  .post('/register', async (c) =>
+    c.json(await authService.register(CredentialsSchema.parse(await c.req.json())), 201),
+  )
+  .post('/login', async (c) =>
+    c.json(await authService.login(CredentialsSchema.parse(await c.req.json()))),
+  )
+  .post('/refresh', async (c) =>
+    c.json(await authService.refresh(RefreshSchema.parse(await c.req.json()).refreshToken)),
+  )
+  .get('/me', requireAuth, (c) => c.json(c.get('user')));
+",
+  "src/modules/auth/auth.schema.ts": "import { z } from 'zod';
+
+/** Request body for registering and logging in. */
+export const CredentialsSchema = z.object({
+  email: z.email().toLowerCase(),
+  password: z.string().min(8).max(200),
+});
+
+/** Request body for exchanging a refresh token for new tokens. */
+export const RefreshSchema = z.object({ refreshToken: z.string().min(1) });
+
+export type Credentials = z.infer<typeof CredentialsSchema>;
+
+export interface Account {
+  id: string;
+  email: string;
+  passwordHash: string;
+  createdAt: Date;
+}
+
+/** Storage for accounts. \`auth.repository.ts\` implements it for the chosen database. */
+export interface AccountsRepository {
+  findByEmail(email: string): Promise<Account | null>;
+  findById(id: string): Promise<Account | null>;
+  /** Throws \`AccountExistsError\` if the email is already registered. */
+  create(data: { email: string; passwordHash: string }): Promise<Account>;
+}
+
+/** An auth failure the error handler sends with its status (401 or 409). */
+export class AuthError extends Error {
+  readonly expose = true;
+
+  constructor(
+    readonly status: 401 | 409,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+export class AccountExistsError extends AuthError {
+  constructor() {
+    super(409, 'An account with this email already exists');
+  }
+}
+",
+  "src/modules/auth/auth.service.ts": "import { issueTokens, verifyToken } from '../../lib/jwt';
+import { hashPassword, verifyPassword } from '../../lib/password';
+import { accountsRepository } from './auth.repository';
+import { AuthError, type Credentials } from './auth.schema';
+
+const invalidCredentials = () => new AuthError(401, 'Invalid email or password');
+
+/** Framework-independent auth logic; the routes only parse requests and send responses. */
+export const authService = {
+  async register({ email, password }: Credentials) {
+    const account = await accountsRepository.create({
+      email,
+      passwordHash: await hashPassword(password),
+    });
+    return issueTokens(account.id);
+  },
+
+  async login({ email, password }: Credentials) {
+    const account = await accountsRepository.findByEmail(email);
+    if (!account || !(await verifyPassword(password, account.passwordHash))) {
+      throw invalidCredentials();
+    }
+    return issueTokens(account.id);
+  },
+
+  /** Refresh tokens are stateless JWTs: valid until they expire (see the README). */
+  async refresh(refreshToken: string) {
+    const id = await verifyToken(refreshToken, 'refresh');
+    if (!id || !(await accountsRepository.findById(id))) {
+      throw new AuthError(401, 'Invalid refresh token');
+    }
+    return issueTokens(id);
+  },
+
+  /** The account behind an \`Authorization: Bearer <access token>\` header. */
+  async authenticate(authorization: string | undefined) {
+    const token = authorization?.match(/^Bearer (.+)$/i)?.[1];
+    const id = token && (await verifyToken(token, 'access'));
+    const account = id ? await accountsRepository.findById(id) : null;
+    if (!account) throw new AuthError(401, 'Authentication required');
+    return { id: account.id, email: account.email };
+  },
+};
+
+export type AuthUser = Awaited<ReturnType<typeof authService.authenticate>>;
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "tests/auth.test.ts": "import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app';
+import { memoryAccountsRepository } from './support/memory-accounts-repository';
+
+// The routes run against in-memory accounts, so these tests need no database.
+vi.mock('../src/modules/auth/auth.repository', async () => ({
+  accountsRepository: (await import('./support/memory-accounts-repository'))
+    .memoryAccountsRepository,
+}));
+
+interface Tokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+const ada = { email: 'ada@example.com', password: 'correct horse battery' };
+
+const app = createApp();
+
+async function send(method: string, path: string, body?: unknown, headers = {}) {
+  const response = await app.request(path, {
+    method,
+    headers: { 'content-type': 'application/json', ...headers },
+    ...(body !== undefined && { body: JSON.stringify(body) }),
+  });
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+describe('auth', () => {
+  beforeEach(() => memoryAccountsRepository.reset());
+
+  it('registers, logs in, refreshes and reads the account', async () => {
+    const registered = await send('POST', '/auth/register', ada);
+    expect(registered.status).toBe(201);
+    expect(registered.body).toMatchObject({ tokenType: 'Bearer' });
+
+    const login = await send('POST', '/auth/login', ada);
+    expect(login.status).toBe(200);
+    const { accessToken, refreshToken } = login.body as Tokens;
+
+    const me = await send('GET', '/auth/me', undefined, { authorization: \`Bearer \${accessToken}\` });
+    expect(me.status).toBe(200);
+    expect(me.body).toMatchObject({ email: ada.email });
+
+    const refreshed = await send('POST', '/auth/refresh', { refreshToken });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body).toHaveProperty('accessToken');
+  });
+
+  it('rejects a wrong password, a duplicate email and bad input', async () => {
+    await send('POST', '/auth/register', ada);
+
+    expect((await send('POST', '/auth/login', { ...ada, password: 'wrong-password' })).status).toBe(
+      401,
+    );
+    expect((await send('POST', '/auth/register', ada)).status).toBe(409);
+    const invalid = await send('POST', '/auth/register', { email: 'nope', password: 'x' });
+    expect(invalid.status).toBe(400);
+  });
+
+  it('requires a valid access token', async () => {
+    const { body } = await send('POST', '/auth/register', ada);
+    const { refreshToken } = body as Tokens;
+
+    expect((await send('GET', '/auth/me')).status).toBe(401);
+    const forged = await send('GET', '/auth/me', undefined, { authorization: 'Bearer nope' });
+    expect(forged.status).toBe(401);
+    // A refresh token is not an access token.
+    const wrongType = { authorization: \`Bearer \${refreshToken}\` };
+    expect((await send('GET', '/auth/me', undefined, wrongType)).status).toBe(401);
+  });
+});
+",
+}
+`;
+
+exports[`generated project > --auth jwt with prisma and express 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
+
+# Database connection string
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+
+# Signs access and refresh tokens; at least 32 characters (openssl rand -base64 48)
+JWT_SECRET=change-me-to-a-long-random-string-of-32-chars-or-more
+
+# Access token lifetime
+JWT_ACCESS_TTL=15m
+
+# Refresh token lifetime
+JWT_REFRESH_TTL=7d
+",
+  "prisma/migrations/20261010000000_init/migration.sql": "-- CreateTable
+CREATE TABLE "users" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+",
+  "prisma/migrations/20261011000000_auth/migration.sql": "-- CreateTable
+CREATE TABLE "accounts" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "password_hash" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "accounts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "accounts_email_key" ON "accounts"("email");
+
+",
+  "prisma/migrations/migration_lock.toml": "# Please do not edit this file manually
+# It should be added in your version-control system (e.g., Git)
+provider = "postgresql"
+",
+  "prisma/schema.prisma": "generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+/// Login credentials for JWT auth (src/modules/auth).
+model Account {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("accounts")
+}
+",
+  "src/app.ts": "import { randomUUID } from 'node:crypto';
+import cors from 'cors';
+import express from 'express';
+import { rateLimit } from 'express-rate-limit';
+import helmet from 'helmet';
+import { pinoHttp } from 'pino-http';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { healthRouter } from './modules/health/health.routes';
+import { docsRouter } from './modules/docs/docs.routes';
+import { authRouter } from './modules/auth/auth.routes';
+import { usersRouter } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it directly. */
+export function createApp() {
+  const app = express();
+
+  app.use(
+    pinoHttp({
+      logger,
+      // Reuse an incoming X-Request-Id (from a proxy) or create one, and echo it back.
+      genReqId: (req, res) => {
+        const id = req.headers['x-request-id']?.toString() || randomUUID();
+        res.setHeader('x-request-id', id);
+        return id;
+      },
+      autoLogging: { ignore: (req) => req.url === '/health' || req.url === '/ready' },
+    }),
+  );
+  app.use(helmet());
+  // Health checks stay outside CORS and rate limiting.
+  app.use(healthRouter);
+
+  app.use(cors({ origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') }));
+  app.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: env.RATE_LIMIT_PER_MINUTE,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+    }),
+  );
+  app.use(express.json({ limit: env.BODY_LIMIT_KB * 1024 }));
+
+  app.use(docsRouter);
+  app.use('/auth', authRouter);
+  app.use('/users', usersRouter);
+  app.use(notFound);
+  app.use(errorHandler);
+
+  return app;
+}
+",
+  "src/lib/jwt.ts": "import { jwtVerify, SignJWT } from 'jose';
+import { env } from '../config/env';
+
+const secret = new TextEncoder().encode(env.JWT_SECRET);
+const ISSUER = 'api';
+
+export type TokenType = 'access' | 'refresh';
+
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: 'Bearer';
+  expiresIn: string;
+}
+
+/** Sign a short-lived access token or a longer-lived refresh token for this account id. */
+function sign(subject: string, type: TokenType) {
+  return new SignJWT({ type })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(subject)
+    .setIssuer(ISSUER)
+    .setIssuedAt()
+    .setExpirationTime(type === 'access' ? env.JWT_ACCESS_TTL : env.JWT_REFRESH_TTL)
+    .sign(secret);
+}
+
+export async function issueTokens(subject: string): Promise<TokenPair> {
+  const [accessToken, refreshToken] = await Promise.all([
+    sign(subject, 'access'),
+    sign(subject, 'refresh'),
+  ]);
+  return { accessToken, refreshToken, tokenType: 'Bearer', expiresIn: env.JWT_ACCESS_TTL };
+}
+
+/** The account id in a valid token of this type, or null if it's invalid, expired or the wrong type. */
+export async function verifyToken(token: string, type: TokenType): Promise<string | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret, { issuer: ISSUER, algorithms: ['HS256'] });
+    return payload.type === type && payload.sub ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+",
+  "src/lib/password.ts": "import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
+
+const scryptAsync = promisify(scrypt) as (
+  password: string,
+  salt: Buffer,
+  keylen: number,
+) => Promise<Buffer>;
+
+const KEY_LENGTH = 64;
+
+/**
+ * Hash a password with scrypt (built into Node, no native dependency) and a random salt.
+ * The result stores both as \`scrypt$<salt>$<hash>\` in base64.
+ */
+export async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16);
+  const hash = await scryptAsync(password, salt, KEY_LENGTH);
+  return \`scrypt$\${salt.toString('base64')}$\${hash.toString('base64')}\`;
+}
+
+/** Check a password against a stored hash, in constant time. */
+export async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [scheme, salt, hash] = stored.split('$');
+  if (scheme !== 'scrypt' || !salt || !hash) return false;
+  const expected = Buffer.from(hash, 'base64');
+  const actual = await scryptAsync(password, Buffer.from(salt, 'base64'), expected.length);
+  return timingSafeEqual(actual, expected);
+}
+",
+  "src/modules/auth/auth.openapi.ts": "import { z } from 'zod';
+import type { ZodOpenApiOperationObject, ZodOpenApiPathsObject } from 'zod-openapi';
+import { errorResponse, json } from '../../openapi/schemas';
+import { CredentialsSchema, RefreshSchema } from './auth.schema';
+
+const TokensSchema = z
+  .object({
+    accessToken: z.string(),
+    refreshToken: z.string(),
+    tokenType: z.literal('Bearer'),
+    expiresIn: z.string(),
+  })
+  .meta({ id: 'Tokens' });
+
+const tokens = (description: string) => ({ description, content: json(TokensSchema) });
+const invalid = errorResponse('Invalid request body');
+const tagged = (operation: ZodOpenApiOperationObject) => ({ tags: ['auth'], ...operation });
+
+/** OpenAPI paths for the auth routes, added to the document in src/openapi/document.ts. */
+export const authPaths: ZodOpenApiPathsObject = {
+  '/auth/register': {
+    post: tagged({
+      summary: 'Create an account and get tokens',
+      requestBody: { content: json(CredentialsSchema) },
+      responses: {
+        '201': tokens('Registered'),
+        '400': invalid,
+        '409': errorResponse('Email already registered'),
+      },
+    }),
+  },
+  '/auth/login': {
+    post: tagged({
+      summary: 'Log in and get tokens',
+      requestBody: { content: json(CredentialsSchema) },
+      responses: {
+        '200': tokens('Logged in'),
+        '400': invalid,
+        '401': errorResponse('Wrong email or password'),
+      },
+    }),
+  },
+  '/auth/refresh': {
+    post: tagged({
+      summary: 'Exchange a refresh token for new tokens',
+      requestBody: { content: json(RefreshSchema) },
+      responses: { '200': tokens('New tokens'), '401': errorResponse('Invalid refresh token') },
+    }),
+  },
+  '/auth/me': {
+    get: tagged({
+      summary: 'The logged-in account',
+      security: [{ bearerAuth: [] }],
+      responses: {
+        '200': {
+          description: 'The account',
+          content: json(z.object({ id: z.string(), email: z.email() })),
+        },
+        '401': errorResponse('Missing or invalid access token'),
+      },
+    }),
+  },
+};
+",
+  "src/modules/auth/auth.repository.ts": "import { prisma } from '../../db/client';
+import { Prisma } from '../../generated/prisma/client';
+import { AccountExistsError, type AccountsRepository } from './auth.schema';
+
+export const accountsRepository: AccountsRepository = {
+  findByEmail: (email) => prisma.account.findUnique({ where: { email } }),
+
+  findById: (id) => prisma.account.findUnique({ where: { id } }),
+
+  async create(data) {
+    try {
+      return await prisma.account.create({ data });
+    } catch (error) {
+      // P2002: unique constraint failed (the email).
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new AccountExistsError();
+      }
+      throw error;
+    }
+  },
+};
+",
+  "src/modules/auth/auth.routes.ts": "import { type RequestHandler, Router } from 'express';
+import { CredentialsSchema, RefreshSchema } from './auth.schema';
+import { authService } from './auth.service';
+
+/** Rejects a request without a valid access token (401); the account is in \`res.locals.user\`. */
+export const requireAuth: RequestHandler = async (req, res, next) => {
+  res.locals.user = await authService.authenticate(req.headers.authorization);
+  next();
+};
+
+export const authRouter = Router()
+  .post('/register', async (req, res) => {
+    res.status(201).json(await authService.register(CredentialsSchema.parse(req.body)));
+  })
+  .post('/login', async (req, res) => {
+    res.json(await authService.login(CredentialsSchema.parse(req.body)));
+  })
+  .post('/refresh', async (req, res) => {
+    res.json(await authService.refresh(RefreshSchema.parse(req.body).refreshToken));
+  })
+  .get('/me', requireAuth, (_req, res) => {
+    res.json(res.locals.user);
+  });
+",
+  "src/modules/auth/auth.schema.ts": "import { z } from 'zod';
+
+/** Request body for registering and logging in. */
+export const CredentialsSchema = z.object({
+  email: z.email().toLowerCase(),
+  password: z.string().min(8).max(200),
+});
+
+/** Request body for exchanging a refresh token for new tokens. */
+export const RefreshSchema = z.object({ refreshToken: z.string().min(1) });
+
+export type Credentials = z.infer<typeof CredentialsSchema>;
+
+export interface Account {
+  id: string;
+  email: string;
+  passwordHash: string;
+  createdAt: Date;
+}
+
+/** Storage for accounts. \`auth.repository.ts\` implements it for the chosen database. */
+export interface AccountsRepository {
+  findByEmail(email: string): Promise<Account | null>;
+  findById(id: string): Promise<Account | null>;
+  /** Throws \`AccountExistsError\` if the email is already registered. */
+  create(data: { email: string; passwordHash: string }): Promise<Account>;
+}
+
+/** An auth failure the error handler sends with its status (401 or 409). */
+export class AuthError extends Error {
+  readonly expose = true;
+
+  constructor(
+    readonly status: 401 | 409,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+export class AccountExistsError extends AuthError {
+  constructor() {
+    super(409, 'An account with this email already exists');
+  }
+}
+",
+  "src/modules/auth/auth.service.ts": "import { issueTokens, verifyToken } from '../../lib/jwt';
+import { hashPassword, verifyPassword } from '../../lib/password';
+import { accountsRepository } from './auth.repository';
+import { AuthError, type Credentials } from './auth.schema';
+
+const invalidCredentials = () => new AuthError(401, 'Invalid email or password');
+
+/** Framework-independent auth logic; the routes only parse requests and send responses. */
+export const authService = {
+  async register({ email, password }: Credentials) {
+    const account = await accountsRepository.create({
+      email,
+      passwordHash: await hashPassword(password),
+    });
+    return issueTokens(account.id);
+  },
+
+  async login({ email, password }: Credentials) {
+    const account = await accountsRepository.findByEmail(email);
+    if (!account || !(await verifyPassword(password, account.passwordHash))) {
+      throw invalidCredentials();
+    }
+    return issueTokens(account.id);
+  },
+
+  /** Refresh tokens are stateless JWTs: valid until they expire (see the README). */
+  async refresh(refreshToken: string) {
+    const id = await verifyToken(refreshToken, 'refresh');
+    if (!id || !(await accountsRepository.findById(id))) {
+      throw new AuthError(401, 'Invalid refresh token');
+    }
+    return issueTokens(id);
+  },
+
+  /** The account behind an \`Authorization: Bearer <access token>\` header. */
+  async authenticate(authorization: string | undefined) {
+    const token = authorization?.match(/^Bearer (.+)$/i)?.[1];
+    const id = token && (await verifyToken(token, 'access'));
+    const account = id ? await accountsRepository.findById(id) : null;
+    if (!account) throw new AuthError(401, 'Authentication required');
+    return { id: account.id, email: account.email };
+  },
+};
+
+export type AuthUser = Awaited<ReturnType<typeof authService.authenticate>>;
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "tests/auth.test.ts": "import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app';
+import { memoryAccountsRepository } from './support/memory-accounts-repository';
+
+// The routes run against in-memory accounts, so these tests need no database.
+vi.mock('../src/modules/auth/auth.repository', async () => ({
+  accountsRepository: (await import('./support/memory-accounts-repository'))
+    .memoryAccountsRepository,
+}));
+
+interface Tokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+const ada = { email: 'ada@example.com', password: 'correct horse battery' };
+
+const app = createApp();
+
+async function send(method: string, path: string, body?: unknown, headers = {}) {
+  const req = request(app)[method.toLowerCase() as 'get' | 'post'](path).set(headers);
+  const response = body === undefined ? await req : await req.send(body as object);
+  return { status: response.status, body: response.body as unknown };
+}
+
+describe('auth', () => {
+  beforeEach(() => memoryAccountsRepository.reset());
+
+  it('registers, logs in, refreshes and reads the account', async () => {
+    const registered = await send('POST', '/auth/register', ada);
+    expect(registered.status).toBe(201);
+    expect(registered.body).toMatchObject({ tokenType: 'Bearer' });
+
+    const login = await send('POST', '/auth/login', ada);
+    expect(login.status).toBe(200);
+    const { accessToken, refreshToken } = login.body as Tokens;
+
+    const me = await send('GET', '/auth/me', undefined, { authorization: \`Bearer \${accessToken}\` });
+    expect(me.status).toBe(200);
+    expect(me.body).toMatchObject({ email: ada.email });
+
+    const refreshed = await send('POST', '/auth/refresh', { refreshToken });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.body).toHaveProperty('accessToken');
+  });
+
+  it('rejects a wrong password, a duplicate email and bad input', async () => {
+    await send('POST', '/auth/register', ada);
+
+    expect((await send('POST', '/auth/login', { ...ada, password: 'wrong-password' })).status).toBe(
+      401,
+    );
+    expect((await send('POST', '/auth/register', ada)).status).toBe(409);
+    const invalid = await send('POST', '/auth/register', { email: 'nope', password: 'x' });
+    expect(invalid.status).toBe(400);
+  });
+
+  it('requires a valid access token', async () => {
+    const { body } = await send('POST', '/auth/register', ada);
+    const { refreshToken } = body as Tokens;
+
+    expect((await send('GET', '/auth/me')).status).toBe(401);
+    const forged = await send('GET', '/auth/me', undefined, { authorization: 'Bearer nope' });
+    expect(forged.status).toBe(401);
+    // A refresh token is not an access token.
+    const wrongType = { authorization: \`Bearer \${refreshToken}\` };
+    expect((await send('GET', '/auth/me', undefined, wrongType)).status).toBe(401);
+  });
+});
+",
+}
+`;
+
 exports[`generated project > --cache bullmq adds Redis, a worker and its compose service 1`] = `
 "import { Worker } from 'bullmq';
 import { env } from './config/env';
