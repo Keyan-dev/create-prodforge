@@ -185,12 +185,20 @@ async function expectJwtAuth(port: number) {
 /** Sign up and in with Better Auth, then call a protected route with the cookie and the token. */
 async function expectBetterAuth(port: number) {
   const credentials = { email: `grace-${Date.now()}@example.com`, password: 'correct-horse' };
+  // fetch sends Sec-Fetch-Mode like a browser, so in production Better Auth wants a trusted
+  // Origin. BETTER_AUTH_URL in .env.example is http://localhost:3000.
+  const headers = { origin: 'http://localhost:3000' };
   const signUp = await json(port, '/api/auth/sign-up/email', {
     method: 'POST',
     body: { ...credentials, name: 'Grace' },
+    headers,
   });
   expect(signUp.status).toBe(200);
-  const signIn = await json(port, '/api/auth/sign-in/email', { method: 'POST', body: credentials });
+  const signIn = await json(port, '/api/auth/sign-in/email', {
+    method: 'POST',
+    body: credentials,
+    headers,
+  });
   expect(signIn.status).toBe(200);
   const cookie = signIn.headers
     .getSetCookie()
