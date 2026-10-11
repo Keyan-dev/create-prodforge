@@ -7,7 +7,7 @@ npm create prodforge@latest my-api
 # or: pnpm create prodforge my-api · yarn create prodforge my-api · bun create prodforge my-api
 ```
 
-![create-prodforge generating a project with the full preset](./docs/demo.gif)
+![create-prodforge generating a project with the full preset](https://raw.githubusercontent.com/Keyan-dev/create-prodforge/main/docs/demo.gif)
 
 ## Why
 
