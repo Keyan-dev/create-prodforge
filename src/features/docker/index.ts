@@ -117,8 +117,15 @@ export const docker: Feature = {
         environment: app.environment,
         ...(app.depends_on !== undefined && { depends_on: app.depends_on }),
         restart: 'unless-stopped',
-        // The image's HEALTHCHECK calls the HTTP server, which only the app runs.
-        healthcheck: { disable: true },
+        // The image's HEALTHCHECK calls the HTTP server, which only the app runs. A process with no
+        // server is healthy while it runs (`docker compose up --wait` refuses services without one).
+        healthcheck: {
+          test: ['CMD-SHELL', 'kill -0 1'],
+          interval: '30s',
+          timeout: '3s',
+          start_period: '5s',
+          start_interval: '1s',
+        },
       };
     }
 

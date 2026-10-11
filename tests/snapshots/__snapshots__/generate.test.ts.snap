@@ -182,7 +182,13 @@ exports[`generated project > --cache bullmq adds Redis, a worker and its compose
         condition: service_completed_successfully
     restart: unless-stopped
     healthcheck:
-      disable: true
+      test:
+        - CMD-SHELL
+        - kill -0 1
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      start_interval: 1s
   postgres:
     image: postgres:18-alpine
     environment:
