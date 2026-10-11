@@ -1,4 +1,3 @@
-// @slot:imports
 /** A dependency the app needs before it can serve traffic (database, cache, …). */
 export interface ReadinessCheck {
   name: string;
@@ -6,7 +5,11 @@ export interface ReadinessCheck {
 }
 
 const checks: ReadinessCheck[] = [];
-// @slot:readiness-checks
+
+/** Register a dependency check, e.g. from the module that opens a database connection. */
+export function addReadinessCheck(name: string, check: () => Promise<void>) {
+  checks.push({ name, check });
+}
 
 let shuttingDown = false;
 

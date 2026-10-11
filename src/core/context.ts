@@ -36,9 +36,16 @@ export class EnvRegistry {
   }
 }
 
-/** Docker Compose services other features need (Postgres, Redis, …). The docker feature writes them. */
+/**
+ * What other features need from Docker Compose: services (Postgres, Redis, …), named volumes,
+ * environment for the app container, and a migration script to run before the app starts. The
+ * docker feature turns this into compose.yaml.
+ */
 export class ComposeRegistry {
   readonly #services = new Map<string, Record<string, unknown>>();
+  readonly #volumes = new Set<string>();
+  readonly #appEnv = new Map<string, string>();
+  #migrateScript: string | undefined;
 
   addService(name: string, definition: Record<string, unknown>): void {
     if (this.#services.has(name)) throw new Error(`Compose service "${name}" is already defined`);
@@ -47,6 +54,39 @@ export class ComposeRegistry {
 
   services(): Record<string, Record<string, unknown>> {
     return Object.fromEntries(this.#services);
+  }
+
+  addVolume(name: string): void {
+    this.#volumes.add(name);
+  }
+
+  volumes(): string[] {
+    return [...this.#volumes];
+  }
+
+  /** Env vars for the app container, e.g. a DATABASE_URL that points at a compose service. */
+  addAppEnv(key: string, value: string): void {
+    const existing = this.#appEnv.get(key);
+    if (existing !== undefined && existing !== value) {
+      throw new Error(`Conflicting compose env var ${key}: "${existing}" vs "${value}"`);
+    }
+    this.#appEnv.set(key, value);
+  }
+
+  appEnv(): Record<string, string> {
+    return Object.fromEntries(this.#appEnv);
+  }
+
+  /** A package.json script that applies migrations; compose runs it once before the app. */
+  setMigrateScript(script: string): void {
+    if (this.#migrateScript && this.#migrateScript !== script) {
+      throw new Error(`Conflicting migrate scripts: "${this.#migrateScript}" vs "${script}"`);
+    }
+    this.#migrateScript = script;
+  }
+
+  migrateScript(): string | undefined {
+    return this.#migrateScript;
   }
 }
 
@@ -118,10 +158,11 @@ export class GeneratorContext {
 
   /**
    * Queue `code` for the `@slot:<slot>` marker in `path`. Injections are applied after every
-   * feature has run, so the file may be written by a feature that runs later.
+   * feature has run, so the file may be written by a feature that runs later. With `optional`,
+   * a file that no feature wrote is skipped instead of being an error.
    */
-  inject(path: string, slot: string, code: string): void {
-    this.#injections.push({ path, slot, code });
+  inject(path: string, slot: string, code: string, options: { optional?: boolean } = {}): void {
+    this.#injections.push({ path, slot, code, ...options });
   }
 
   get injections(): readonly Injection[] {

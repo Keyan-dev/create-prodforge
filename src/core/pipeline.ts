@@ -71,7 +71,10 @@ export async function generate(
   for (const feature of features) await feature.apply(ctx);
   for (const feature of features) await feature.finalize?.(ctx);
 
-  const byFile = Map.groupBy(ctx.injections, (injection) => normalizePath(injection.path));
+  const injections = ctx.injections.filter(
+    (injection) => !injection.optional || ctx.vfs.has(normalizePath(injection.path)),
+  );
+  const byFile = Map.groupBy(injections, (injection) => normalizePath(injection.path));
   for (const [path, injections] of byFile) {
     if (!ctx.vfs.has(path)) throw new Error(`Can't inject into ${path}: no feature wrote it`);
     ctx.vfs.write(path, applySlots(path, ctx.vfs.read(path), injections));

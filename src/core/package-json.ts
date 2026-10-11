@@ -41,6 +41,7 @@ export class PackageJsonBuilder {
   readonly #deps: DepMap = {};
   readonly #devDeps: DepMap = {};
   readonly #scripts: Record<string, string> = {};
+  readonly #allowedBuilds = new Set<string>();
 
   /** Set a top-level field such as `name`, `type` or `engines`. */
   set(key: string, value: unknown): this {
@@ -63,6 +64,15 @@ export class PackageJsonBuilder {
     return this.#merge(this.#scripts, scripts, 'script');
   }
 
+  /**
+   * Let these dependencies run their install scripts. pnpm 10 skips them unless they are listed
+   * in `pnpm.onlyBuiltDependencies`, so only call this for pnpm projects.
+   */
+  allowBuilds(...names: string[]): this {
+    for (const name of names) this.#allowedBuilds.add(name);
+    return this;
+  }
+
   #merge(target: Record<string, string>, incoming: Record<string, string>, kind: string): this {
     for (const [name, value] of Object.entries(incoming)) {
       const existing = target[name];
@@ -83,6 +93,9 @@ export class PackageJsonBuilder {
       Object.entries(this.#devDeps).filter(([name]) => !(name in this.#deps)),
     );
     const all: Record<string, unknown> = { ...this.#fields };
+    if (this.#allowedBuilds.size) {
+      all.pnpm = { onlyBuiltDependencies: [...this.#allowedBuilds].sort() };
+    }
     if (Object.keys(this.#scripts).length) all.scripts = sortKeys(this.#scripts);
     if (Object.keys(this.#deps).length) {
       all.dependencies = sortKeys(

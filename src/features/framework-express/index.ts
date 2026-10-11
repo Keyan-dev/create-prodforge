@@ -31,5 +31,16 @@ export const frameworkExpress: Feature = {
     );
 
     await ctx.files.copyDir(featureFiles('framework-express'));
+
+    // Routes and tests for the example users module (see the example-users feature).
+    if (ctx.cfg.example && ctx.cfg.db !== 'none') {
+      await ctx.files.copyDir(featureFiles('framework-express', 'files-example'));
+      ctx.inject(
+        'src/app.ts',
+        'imports',
+        "import { usersRouter } from './modules/users/users.routes';",
+      );
+      ctx.inject('src/app.ts', 'routes', "app.use('/users', usersRouter);");
+    }
   },
 };

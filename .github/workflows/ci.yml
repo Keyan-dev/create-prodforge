@@ -35,8 +35,15 @@ jobs:
           test -f smoke-app/src/app.ts && test -f smoke-app/.gitignore
 
   e2e:
-    # Generate → install → lint/test/build/run for real (PLAN.md §6).
+    # Generate → install → lint/test/build/run for real (PLAN.md §6), one job per database.
+    name: e2e (${{ matrix.db }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [prisma, drizzle, mongoose, none]
+    env:
+      PRODFORGE_E2E_DB: ${{ matrix.db }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4

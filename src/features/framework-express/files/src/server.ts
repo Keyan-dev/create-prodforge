@@ -4,6 +4,7 @@ import { logger } from './lib/logger';
 import { markShuttingDown } from './lib/readiness';
 // @slot:imports
 
+// @slot:startup
 const server = createApp().listen(env.PORT, () => {
   logger.info(`Listening on http://localhost:${env.PORT}`);
   // Tells PM2 (wait_ready) that this worker can take traffic.

@@ -36,6 +36,20 @@ export async function promptForMissing(
       }),
     );
   }
+  if (answers.db === undefined) {
+    answers.db = unwrap(
+      await p.select({
+        message: 'Database',
+        initialValue: 'prisma' as const,
+        options: [
+          { value: 'prisma', label: 'Prisma + PostgreSQL', hint: 'recommended' },
+          { value: 'drizzle', label: 'Drizzle + PostgreSQL' },
+          { value: 'mongoose', label: 'Mongoose + MongoDB' },
+          { value: 'none', label: 'None' },
+        ],
+      }),
+    );
+  }
   if (answers.install === undefined) {
     answers.install = unwrap(await p.confirm({ message: 'Install dependencies?' }));
   }

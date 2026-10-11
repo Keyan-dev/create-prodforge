@@ -54,4 +54,18 @@ describe('ComposeRegistry', () => {
     expect(compose.services()).toEqual({ postgres: { image: 'postgres:18' } });
     expect(() => compose.addService('postgres', {})).toThrow(/already defined/);
   });
+
+  it('collects volumes, app env and the migrate script', () => {
+    const compose = new ComposeRegistry();
+    compose.addVolume('data');
+    compose.addVolume('data');
+    compose.addAppEnv('DATABASE_URL', 'postgresql://postgres');
+    compose.addAppEnv('DATABASE_URL', 'postgresql://postgres');
+    compose.setMigrateScript('db:deploy');
+    expect(compose.volumes()).toEqual(['data']);
+    expect(compose.appEnv()).toEqual({ DATABASE_URL: 'postgresql://postgres' });
+    expect(compose.migrateScript()).toBe('db:deploy');
+    expect(() => compose.addAppEnv('DATABASE_URL', 'mongodb://mongo')).toThrow(/Conflicting/);
+    expect(() => compose.setMigrateScript('migrate')).toThrow(/Conflicting/);
+  });
 });

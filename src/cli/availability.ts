@@ -12,8 +12,7 @@ export function unavailable(cfg: ProjectConfig): { blocking: string[]; skipped: 
   ].filter((item): item is string => Boolean(item));
 
   const skipped = [
-    cfg.db !== 'none' && `database (${cfg.db})`,
-    cfg.example && 'example module',
+    cfg.example && cfg.db === 'none' && 'example module (it needs a database)',
     cfg.cache !== 'none' && `cache (${cfg.cache})`,
     cfg.auth !== 'none' && `auth (${cfg.auth})`,
     cfg.openapi && 'OpenAPI',

@@ -7,6 +7,7 @@ Generated with [create-prodforge](https://github.com/Keyan-dev/create-prodforge)
 
 ```bash
 cp .env.example .env
+<!-- @slot:setup -->
 <%= run %> dev
 ```
 

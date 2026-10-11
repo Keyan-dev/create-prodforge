@@ -44,13 +44,15 @@ describe('unavailable', () => {
     expect(unavailable(parseConfig({ name: 'x', framework: 'hono' })).blocking).toEqual([
       'framework "hono"',
     ]);
-    expect(unavailable(parseConfig({ name: 'x' })).skipped).toContain('database (prisma)');
+    expect(unavailable(parseConfig({ name: 'x' })).skipped).toContain('OpenAPI');
+    expect(unavailable(parseConfig({ name: 'x', db: 'none', example: true })).skipped).toContain(
+      'example module (it needs a database)',
+    );
   });
 
   it('reports nothing for a config the current features fully cover', () => {
     const cfg = parseConfig({
       name: 'x',
-      db: 'none',
       openapi: false,
       docker: false,
       pm2: false,

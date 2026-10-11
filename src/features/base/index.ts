@@ -30,7 +30,7 @@ export const base: Feature = {
       // Pin pnpm so local installs, CI and the Docker image all produce the same lockfile.
       ctx.pkg.set('packageManager', `pnpm@${versions.pnpm}`);
       // pnpm 10 skips dependency build scripts unless allowed; tsx needs esbuild's.
-      ctx.pkg.set('pnpm', { onlyBuiltDependencies: ['esbuild'] });
+      ctx.pkg.allowBuilds('esbuild');
     }
     ctx.env.add('NODE_ENV', 'development', 'development | test | production');
     ctx.env.add('PORT', '3000', 'Port the HTTP server listens on');

@@ -11,11 +11,11 @@ export default defineConfig({
   fixedExtension: false,
   // Bundle to a single file. Runtime dependencies stay external and are installed with the CLI.
   outDir: 'dist',
-  // Ship each feature's template directory next to the bundle (src/core/templates.ts finds them).
+  // Ship each feature's template directories (`files/`, `files-example/`, …) next to the bundle (src/core/templates.ts finds them).
   async onSuccess() {
     await cp('src/features', 'dist/features', {
       recursive: true,
-      filter: (source) => !/\.ts$/.test(source) || source.includes('/files/'),
+      filter: (source) => !/\.ts$/.test(source) || /\/files[\w-]*\//.test(source),
     });
   },
 });

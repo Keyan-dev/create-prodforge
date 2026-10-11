@@ -153,6 +153,21 @@ describe('generate', () => {
     await expect(generate(cfg, registry)).rejects.toThrow(/Can't inject into src\/missing.ts/);
   });
 
+  it('skips an optional injection when the file is missing', async () => {
+    const registry = [
+      feature('x', {
+        apply(ctx) {
+          ctx.files.write('a.ts', '// @slot:imports\n');
+          ctx.inject('Dockerfile', 'install-files', 'COPY x ./', { optional: true });
+          ctx.inject('a.ts', 'imports', 'import x;', { optional: true });
+        },
+      }),
+    ];
+    const result = await generate(cfg, registry);
+    expect(result.files.has('Dockerfile')).toBe(false);
+    expect(result.files.read('a.ts')).toBe('import x;\n');
+  });
+
   it('surfaces package.json conflicts between features', async () => {
     const registry = [
       feature('a', { apply: (ctx) => void ctx.pkg.addDeps({ zod: '4.6.5' }) }),

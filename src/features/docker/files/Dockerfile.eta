@@ -11,13 +11,15 @@ RUN <%= it.pm.setup %>
 # All dependencies, for building.
 FROM base AS deps
 COPY package.json <%= it.pm.lockfile %> ./
+# @slot:install-files
 RUN <%= it.pm.install %>
 
 FROM deps AS build
 COPY . .
 RUN <%= it.pm.build %>
 
-# Production dependencies only, for the final image.
+# Production dependencies only, for the final image. Scripts are skipped: install hooks such as
+# code generation already ran in the deps stage, and their tools are dev dependencies.
 FROM base AS prod-deps
 COPY package.json <%= it.pm.lockfile %> ./
 RUN <%= it.pm.installProd %>
