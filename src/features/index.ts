@@ -8,10 +8,13 @@ import { exampleUsers } from './example-users';
 import { frameworkExpress } from './framework-express';
 import { frameworkFastify } from './framework-fastify';
 import { frameworkHono } from './framework-hono';
+import { cacheRedis } from './cache-redis';
 import { ciGithub } from './ci-github';
 import { gitHooks } from './git-hooks';
 import { lintBiome } from './lint-biome';
 import { openapi } from './openapi';
+import { otel } from './otel';
+import { queueBullmq } from './queue-bullmq';
 import { lintEslint } from './lint-eslint';
 import { pm2 } from './pm2';
 import { testingVitest } from './testing-vitest';
@@ -27,6 +30,9 @@ export const features: Feature[] = [
   dbMongoose,
   exampleUsers,
   openapi,
+  cacheRedis,
+  queueBullmq,
+  otel,
   testingVitest,
   lintEslint,
   lintBiome,

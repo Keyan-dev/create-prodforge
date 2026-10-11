@@ -1,5 +1,269 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`generated project > --cache bullmq adds Redis, a worker and its compose service 1`] = `
+"import { Worker } from 'bullmq';
+import { env } from './config/env';
+import { bullConnection } from './jobs/connection';
+import { EXAMPLE_QUEUE, processExampleJob } from './jobs/example.job';
+import { logger } from './lib/logger';
+
+/**
+ * The background worker: a separate process from the HTTP server, so slow jobs never hold up
+ * requests and each side scales on its own. Run it with \`start:worker\` (or \`dev:worker\`).
+ */
+const workers = [
+  new Worker(EXAMPLE_QUEUE, processExampleJob, {
+    connection: bullConnection(),
+    concurrency: env.WORKER_CONCURRENCY,
+  }),
+];
+
+for (const worker of workers) {
+  worker.on('failed', (job, error) => {
+    logger.error({ err: error, jobId: job?.id, queue: worker.name }, 'Job failed');
+  });
+  worker.on('error', (error) => logger.error({ err: error, queue: worker.name }, 'Worker error'));
+}
+
+await Promise.all(workers.map((worker) => worker.waitUntilReady()));
+logger.info({ queues: workers.map((worker) => worker.name) }, 'Worker started');
+
+let shuttingDown = false;
+
+/** Let running jobs finish (up to SHUTDOWN_TIMEOUT_MS), then exit. */
+async function shutdown(reason: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Worker shutting down');
+  const timer = setTimeout(() => {
+    logger.error('Jobs did not finish in time, exiting');
+    process.exit(1);
+  }, env.SHUTDOWN_TIMEOUT_MS);
+  timer.unref();
+  await Promise.all(workers.map((worker) => worker.close()));
+  process.exit(0);
+}
+
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
+process.once('SIGINT', () => void shutdown('SIGINT'));
+"
+`;
+
+exports[`generated project > --cache bullmq adds Redis, a worker and its compose service 2`] = `
+"import { createApp } from './app';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { markShuttingDown } from './lib/readiness';
+import { connectDatabase, disconnectDatabase } from './db/client';
+import { connectRedis, disconnectRedis } from './lib/redis';
+import { closeExampleQueue } from './jobs/example.job';
+
+try {
+  await connectDatabase();
+} catch (error) {
+  logger.fatal({ err: error }, 'Could not connect to the database. Is it running?');
+  process.exit(1);
+}
+
+try {
+  await connectRedis();
+} catch (error) {
+  logger.fatal({ err: error }, 'Could not connect to Redis. Is it running?');
+  process.exit(1);
+}
+
+const server = createApp().listen(env.PORT, () => {
+  logger.info(\`Listening on http://localhost:\${env.PORT}\`);
+  // Tells PM2 (wait_ready) that this worker can take traffic.
+  process.send?.('ready');
+});
+
+let shuttingDown = false;
+
+/** Stop taking new connections, let open requests finish, close resources, then exit. */
+function shutdown(reason: string, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Shutting down');
+  markShuttingDown();
+
+  const timer = setTimeout(() => {
+    logger.error('Open connections did not close in time, exiting');
+    process.exit(1);
+  }, env.SHUTDOWN_TIMEOUT_MS);
+  timer.unref();
+
+  server.close(async (error) => {
+    try {
+      await disconnectDatabase();
+    } catch (closeError) {
+      logger.error({ err: closeError }, 'Error while closing the database');
+    }
+    try {
+      await disconnectRedis();
+    } catch (closeError) {
+      logger.error({ err: closeError }, 'Error while closing Redis');
+    }
+    await closeExampleQueue();
+    if (error) logger.error({ err: error }, 'Error while closing the server');
+    process.exit(error ? 1 : exitCode);
+  });
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  shutdown('unhandledRejection', 1);
+});
+process.on('uncaughtException', (error) => {
+  logger.fatal({ err: error }, 'Uncaught exception');
+  shutdown('uncaughtException', 1);
+});
+"
+`;
+
+exports[`generated project > --cache bullmq adds Redis, a worker and its compose service 3`] = `
+"services:
+  app:
+    build: .
+    ports:
+      - \${PORT:-3000}:3000
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
+      REDIS_URL: redis://redis:6379
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+  migrate:
+    build:
+      context: .
+      target: build
+    command:
+      - pnpm
+      - db:deploy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  worker:
+    build: .
+    command:
+      - node
+      - dist/worker.js
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/app
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - kill -0 1
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      start_interval: 1s
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - \${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d app
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  redis:
+    image: redis:8-alpine
+    ports:
+      - \${REDIS_PORT:-6379}:6379
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  postgres-data: {}
+  redis-data: {}
+"
+`;
+
+exports[`generated project > --cache bullmq adds Redis, a worker and its compose service 4`] = `
+"// PM2 process file. On the server: npm install --global pm2@7.0.4
+// Build first, then: pm2 start ecosystem.config.cjs
+// Log rotation: pm2 install pm2-logrotate
+const env = {
+  NODE_ENV: 'production',
+};
+
+module.exports = {
+  apps: [
+    {
+      name: 'my-api',
+      script: 'dist/server.js',
+      node_args: '--env-file-if-exists=.env',
+      // One worker per CPU, sharing the port.
+      exec_mode: 'cluster',
+      instances: 'max',
+      // Each worker calls process.send('ready') once it's listening.
+      wait_ready: true,
+      listen_timeout: 10_000,
+      // Longer than SHUTDOWN_TIMEOUT_MS so open requests can finish.
+      kill_timeout: 15_000,
+      max_memory_restart: '512M',
+      env,
+    },
+    {
+      name: 'my-api-worker',
+      script: 'dist/worker.js',
+      node_args: '--env-file-if-exists=.env',
+      instances: 1,
+      kill_timeout: 15_000,
+      env,
+    },
+  ],
+};
+"
+`;
+
 exports[`generated project > --db drizzle 1`] = `
 {
   ".env.example": "# development | test | production
@@ -3094,6 +3358,43 @@ exports[`generated project > --lint biome 1`] = `
 "
 `;
 
+exports[`generated project > --otel loads the instrumentation in every start script 1`] = `
+"import { register } from 'node:module';
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+import { NodeSDK } from '@opentelemetry/sdk-node';
+
+/**
+ * OpenTelemetry tracing. Node loads this before the app (\`--import\`), so HTTP, the framework,
+ * database clients and Redis are instrumented automatically, and Pino logs carry the trace id.
+ *
+ * Configure it with the standard OTEL_* variables: OTEL_SERVICE_NAME,
+ * OTEL_EXPORTER_OTLP_ENDPOINT (an OTLP/HTTP collector, default http://localhost:4318),
+ * OTEL_TRACES_EXPORTER (otlp, console or none) and OTEL_SDK_DISABLED=true to turn it off.
+ */
+
+// Patch ES modules as they load (the app is ESM).
+register('@opentelemetry/instrumentation/hook.mjs', import.meta.url);
+
+const sdk = new NodeSDK({
+  instrumentations: [
+    getNodeAutoInstrumentations({
+      // File system spans are noisy and rarely useful.
+      '@opentelemetry/instrumentation-fs': { enabled: false },
+    }),
+  ],
+});
+
+sdk.start();
+
+// Flush pending spans on shutdown. The app's own handlers do the rest.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+  process.once(signal, () => {
+    void sdk.shutdown();
+  });
+}
+"
+`;
+
 exports[`generated project > --yes defaults (express, vitest, eslint, pnpm, node 24) 1`] = `
 {
   "features": [
@@ -3384,6 +3685,10 @@ volumes:
     "ecosystem.config.cjs": "// PM2 process file. On the server: npm install --global pm2@7.0.4
 // Build first, then: pm2 start ecosystem.config.cjs
 // Log rotation: pm2 install pm2-logrotate
+const env = {
+  NODE_ENV: 'production',
+};
+
 module.exports = {
   apps: [
     {
@@ -3399,9 +3704,7 @@ module.exports = {
       // Longer than SHUTDOWN_TIMEOUT_MS so open requests can finish.
       kill_timeout: 15_000,
       max_memory_restart: '512M',
-      env: {
-        NODE_ENV: 'production',
-      },
+      env,
     },
   ],
 };
@@ -4317,7 +4620,10 @@ describe('users', () => {
     "tsdown.config.ts": "import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: ['src/server.ts'],
+  entry: [
+    // Each entry becomes a file in dist/.
+    'src/server.ts',
+  ],
   format: 'esm',
   platform: 'node',
   target: 'node24',

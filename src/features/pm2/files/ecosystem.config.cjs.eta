@@ -1,6 +1,11 @@
 // PM2 process file. On the server: npm install --global pm2@<%= it.pm2Version %>
 // Build first, then: pm2 start ecosystem.config.cjs
 // Log rotation: pm2 install pm2-logrotate
+const env = {
+  NODE_ENV: 'production',
+  // @slot:env
+};
+
 module.exports = {
   apps: [
     {
@@ -16,9 +21,8 @@ module.exports = {
       // Longer than SHUTDOWN_TIMEOUT_MS so open requests can finish.
       kill_timeout: 15_000,
       max_memory_restart: '512M',
-      env: {
-        NODE_ENV: 'production',
-      },
+      env,
     },
+    // @slot:apps
   ],
 };

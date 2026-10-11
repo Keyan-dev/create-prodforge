@@ -46,6 +46,7 @@ export class ComposeRegistry {
   readonly #volumes = new Set<string>();
   readonly #appEnv = new Map<string, string>();
   #migrateScript: string | undefined;
+  readonly #processes = new Map<string, string[]>();
 
   addService(name: string, definition: Record<string, unknown>): void {
     if (this.#services.has(name)) throw new Error(`Compose service "${name}" is already defined`);
@@ -87,6 +88,19 @@ export class ComposeRegistry {
 
   migrateScript(): string | undefined {
     return this.#migrateScript;
+  }
+
+  /**
+   * Another long-running process from the app image, such as a queue worker. It gets the app's
+   * environment and dependencies but no port or HTTP health check.
+   */
+  addAppProcess(name: string, command: string[]): void {
+    if (this.#processes.has(name)) throw new Error(`Compose process "${name}" is already defined`);
+    this.#processes.set(name, command);
+  }
+
+  appProcesses(): Record<string, string[]> {
+    return Object.fromEntries(this.#processes);
   }
 }
 
