@@ -20,8 +20,8 @@ CORS_ORIGIN=*
 # Requests per minute per client IP
 RATE_LIMIT_PER_MINUTE=100
 
-# Largest accepted JSON request body
-BODY_LIMIT=100kb
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
 
 # Database connection string
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
@@ -72,7 +72,11 @@ Drizzle ORM with PostgreSQL. Tables are defined in \`src/db/schema.ts\`. After c
 - \`POST /users\`: create one from \`{ "email", "name" }\`
 - \`GET /users/:id\`, \`PATCH /users/:id\`, \`DELETE /users/:id\`
 
-Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the \`usersRouter\` lines in \`src/app.ts\`.
+Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the users lines in \`src/app.ts\`.
+
+## API docs
+
+The OpenAPI 3.1 document is built from Zod schemas in \`src/openapi/document.ts\` and served at \`/openapi.json\`. Browse it at \`http://localhost:3000/docs\` (Scalar). When you add a route, add its paths to the document too.
 
 ## Docker
 
@@ -267,6 +271,7 @@ export default defineConfig({
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "prepare": "husky",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -274,6 +279,7 @@ export default defineConfig({
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@scalar/express-api-reference": "^0.10.28",
     "cors": "^2.8.6",
     "drizzle-orm": "^0.45.4",
     "express": "^5.3.0",
@@ -282,9 +288,12 @@ export default defineConfig({
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "zod-openapi": "^6.0.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -296,6 +305,8 @@ export default defineConfig({
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
     "supertest": "^7.3.1",
@@ -304,6 +315,13 @@ export default defineConfig({
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,yml,yaml}": "prettier --write"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -322,6 +340,7 @@ import { env } from './config/env';
 import { logger } from './lib/logger';
 import { errorHandler, notFound } from './middleware/error-handler';
 import { healthRouter } from './modules/health/health.routes';
+import { docsRouter } from './modules/docs/docs.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 /** Build the app without listening, so tests can drive it directly. */
@@ -353,8 +372,9 @@ export function createApp() {
       legacyHeaders: false,
     }),
   );
-  app.use(express.json({ limit: env.BODY_LIMIT }));
+  app.use(express.json({ limit: env.BODY_LIMIT_KB * 1024 }));
 
+  app.use(docsRouter);
   app.use('/users', usersRouter);
   app.use(notFound);
   app.use(errorHandler);
@@ -372,7 +392,7 @@ const EnvSchema = z.object({
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   CORS_ORIGIN: z.string().default('*'),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
-  BODY_LIMIT: z.string().default('100kb'),
+  BODY_LIMIT_KB: z.coerce.number().int().positive().default(100),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
 });
 
@@ -424,6 +444,74 @@ export const users = pgTable('users', {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+",
+  "src/modules/users/users.openapi.ts": "import { z } from 'zod';
+import type { ZodOpenApiOperationObject, ZodOpenApiPathsObject } from 'zod-openapi';
+import { errorResponse, json } from '../../openapi/schemas';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+const UserSchema = z
+  .object({
+    id: z.string(),
+    email: z.email(),
+    name: z.string(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: 'User' });
+
+const byId = { path: z.object({ id: z.string() }) };
+const notFound = errorResponse('No user with this id');
+const invalid = errorResponse('Invalid request body or query');
+const emailTaken = errorResponse('Another user already has this email');
+
+const tagged = (operation: ZodOpenApiOperationObject) => ({ tags: ['users'], ...operation });
+
+/** OpenAPI paths for the users routes, added to the document in src/openapi/document.ts. */
+export const usersPaths: ZodOpenApiPathsObject = {
+  '/users': {
+    get: tagged({
+      summary: 'List users',
+      requestParams: { query: ListUsersSchema },
+      responses: {
+        '200': { description: 'A page of users', content: json(z.array(UserSchema)) },
+        '400': invalid,
+      },
+    }),
+    post: tagged({
+      summary: 'Create a user',
+      requestBody: { content: json(CreateUserSchema) },
+      responses: {
+        '201': { description: 'Created', content: json(UserSchema) },
+        '400': invalid,
+        '409': emailTaken,
+      },
+    }),
+  },
+  '/users/{id}': {
+    get: tagged({
+      summary: 'Get a user',
+      requestParams: byId,
+      responses: { '200': { description: 'The user', content: json(UserSchema) }, '404': notFound },
+    }),
+    patch: tagged({
+      summary: 'Update a user',
+      requestParams: byId,
+      requestBody: { content: json(UpdateUserSchema) },
+      responses: {
+        '200': { description: 'The updated user', content: json(UserSchema) },
+        '400': invalid,
+        '404': notFound,
+        '409': emailTaken,
+      },
+    }),
+    delete: tagged({
+      summary: 'Delete a user',
+      requestParams: byId,
+      responses: { '204': { description: 'Deleted' }, '404': notFound },
+    }),
+  },
+};
 ",
   "src/modules/users/users.repository.ts": "import { asc, eq } from 'drizzle-orm';
 import { DatabaseError } from 'pg';
@@ -619,51 +707,21 @@ process.on('uncaughtException', (error) => {
   shutdown('uncaughtException', 1);
 });
 ",
-  "tests/users.test.ts": "import { randomUUID } from 'node:crypto';
-import request from 'supertest';
+  "tests/users.test.ts": "import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
-import {
-  EmailTakenError,
-  type User,
-  type UsersRepository,
-} from '../src/modules/users/users.schema';
+import { memoryUsersRepository } from './support/memory-users-repository';
 
-// The routes are tested against an in-memory repository, so these tests need no database.
-const users = new Map<string, User>();
-
-vi.mock('../src/modules/users/users.repository', () => {
-  const emailTaken = (email: string | undefined, id?: string) =>
-    [...users.values()].some((user) => user.email === email && user.id !== id);
-
-  const usersRepository: UsersRepository = {
-    list: async ({ limit, offset }) => [...users.values()].slice(offset, offset + limit),
-    findById: async (id) => users.get(id) ?? null,
-    create: async (data) => {
-      if (emailTaken(data.email)) throw new EmailTakenError();
-      const now = new Date();
-      const user = { id: randomUUID(), ...data, createdAt: now, updatedAt: now };
-      users.set(user.id, user);
-      return user;
-    },
-    update: async (id, data) => {
-      const user = users.get(id);
-      if (!user) return null;
-      if (emailTaken(data.email, id)) throw new EmailTakenError();
-      const updated = { ...user, ...data, updatedAt: new Date() };
-      users.set(id, updated);
-      return updated;
-    },
-    remove: async (id) => users.delete(id),
-  };
-  return { usersRepository };
-});
+// The routes run against an in-memory repository, so these tests need no database.
+vi.mock('../src/modules/users/users.repository', async () => ({
+  usersRepository: (await import('./support/memory-users-repository')).memoryUsersRepository,
+}));
 
 const app = createApp();
 const ada = { email: 'ada@example.com', name: 'Ada Lovelace' };
 
 describe('users', () => {
-  beforeEach(() => users.clear());
+  beforeEach(() => memoryUsersRepository.reset());
 
   it('creates, reads, updates and deletes a user', async () => {
     const created = await request(app).post('/users').send(ada);
@@ -728,8 +786,8 @@ CORS_ORIGIN=*
 # Requests per minute per client IP
 RATE_LIMIT_PER_MINUTE=100
 
-# Largest accepted JSON request body
-BODY_LIMIT=100kb
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
 
 # Database connection string
 DATABASE_URL=mongodb://localhost:27017/app
@@ -779,7 +837,11 @@ Mongoose with MongoDB. Models live next to their module (\`src/modules/*/*.model
 - \`POST /users\`: create one from \`{ "email", "name" }\`
 - \`GET /users/:id\`, \`PATCH /users/:id\`, \`DELETE /users/:id\`
 
-Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the \`usersRouter\` lines in \`src/app.ts\`.
+Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the users lines in \`src/app.ts\`.
+
+## API docs
+
+The OpenAPI 3.1 document is built from Zod schemas in \`src/openapi/document.ts\` and served at \`/openapi.json\`. Browse it at \`http://localhost:3000/docs\` (Scalar). When you add a route, add its paths to the document too.
 
 ## Docker
 
@@ -848,6 +910,7 @@ volumes:
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
+    "prepare": "husky",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -855,6 +918,7 @@ volumes:
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@scalar/express-api-reference": "^0.10.28",
     "cors": "^2.8.6",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
@@ -862,9 +926,12 @@ volumes:
     "mongoose": "^9.11.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "zod-openapi": "^6.0.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -874,6 +941,8 @@ volumes:
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
     "supertest": "^7.3.1",
@@ -882,6 +951,13 @@ volumes:
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,yml,yaml}": "prettier --write"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -900,6 +976,7 @@ import { env } from './config/env';
 import { logger } from './lib/logger';
 import { errorHandler, notFound } from './middleware/error-handler';
 import { healthRouter } from './modules/health/health.routes';
+import { docsRouter } from './modules/docs/docs.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 /** Build the app without listening, so tests can drive it directly. */
@@ -931,8 +1008,9 @@ export function createApp() {
       legacyHeaders: false,
     }),
   );
-  app.use(express.json({ limit: env.BODY_LIMIT }));
+  app.use(express.json({ limit: env.BODY_LIMIT_KB * 1024 }));
 
+  app.use(docsRouter);
   app.use('/users', usersRouter);
   app.use(notFound);
   app.use(errorHandler);
@@ -950,7 +1028,7 @@ const EnvSchema = z.object({
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   CORS_ORIGIN: z.string().default('*'),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
-  BODY_LIMIT: z.string().default('100kb'),
+  BODY_LIMIT_KB: z.coerce.number().int().positive().default(100),
   DATABASE_URL: z.url({ protocol: /^mongodb(\\+srv)?$/ }),
 });
 
@@ -999,6 +1077,74 @@ const userSchema = new Schema(
 );
 
 export const UserModel = model('User', userSchema);
+",
+  "src/modules/users/users.openapi.ts": "import { z } from 'zod';
+import type { ZodOpenApiOperationObject, ZodOpenApiPathsObject } from 'zod-openapi';
+import { errorResponse, json } from '../../openapi/schemas';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+const UserSchema = z
+  .object({
+    id: z.string(),
+    email: z.email(),
+    name: z.string(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: 'User' });
+
+const byId = { path: z.object({ id: z.string() }) };
+const notFound = errorResponse('No user with this id');
+const invalid = errorResponse('Invalid request body or query');
+const emailTaken = errorResponse('Another user already has this email');
+
+const tagged = (operation: ZodOpenApiOperationObject) => ({ tags: ['users'], ...operation });
+
+/** OpenAPI paths for the users routes, added to the document in src/openapi/document.ts. */
+export const usersPaths: ZodOpenApiPathsObject = {
+  '/users': {
+    get: tagged({
+      summary: 'List users',
+      requestParams: { query: ListUsersSchema },
+      responses: {
+        '200': { description: 'A page of users', content: json(z.array(UserSchema)) },
+        '400': invalid,
+      },
+    }),
+    post: tagged({
+      summary: 'Create a user',
+      requestBody: { content: json(CreateUserSchema) },
+      responses: {
+        '201': { description: 'Created', content: json(UserSchema) },
+        '400': invalid,
+        '409': emailTaken,
+      },
+    }),
+  },
+  '/users/{id}': {
+    get: tagged({
+      summary: 'Get a user',
+      requestParams: byId,
+      responses: { '200': { description: 'The user', content: json(UserSchema) }, '404': notFound },
+    }),
+    patch: tagged({
+      summary: 'Update a user',
+      requestParams: byId,
+      requestBody: { content: json(UpdateUserSchema) },
+      responses: {
+        '200': { description: 'The updated user', content: json(UserSchema) },
+        '400': invalid,
+        '404': notFound,
+        '409': emailTaken,
+      },
+    }),
+    delete: tagged({
+      summary: 'Delete a user',
+      requestParams: byId,
+      responses: { '204': { description: 'Deleted' }, '404': notFound },
+    }),
+  },
+};
 ",
   "src/modules/users/users.repository.ts": "import { isValidObjectId, mongo, type Types } from 'mongoose';
 import { UserModel } from './users.model';
@@ -1207,51 +1353,21 @@ process.on('uncaughtException', (error) => {
   shutdown('uncaughtException', 1);
 });
 ",
-  "tests/users.test.ts": "import { randomUUID } from 'node:crypto';
-import request from 'supertest';
+  "tests/users.test.ts": "import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
-import {
-  EmailTakenError,
-  type User,
-  type UsersRepository,
-} from '../src/modules/users/users.schema';
+import { memoryUsersRepository } from './support/memory-users-repository';
 
-// The routes are tested against an in-memory repository, so these tests need no database.
-const users = new Map<string, User>();
-
-vi.mock('../src/modules/users/users.repository', () => {
-  const emailTaken = (email: string | undefined, id?: string) =>
-    [...users.values()].some((user) => user.email === email && user.id !== id);
-
-  const usersRepository: UsersRepository = {
-    list: async ({ limit, offset }) => [...users.values()].slice(offset, offset + limit),
-    findById: async (id) => users.get(id) ?? null,
-    create: async (data) => {
-      if (emailTaken(data.email)) throw new EmailTakenError();
-      const now = new Date();
-      const user = { id: randomUUID(), ...data, createdAt: now, updatedAt: now };
-      users.set(user.id, user);
-      return user;
-    },
-    update: async (id, data) => {
-      const user = users.get(id);
-      if (!user) return null;
-      if (emailTaken(data.email, id)) throw new EmailTakenError();
-      const updated = { ...user, ...data, updatedAt: new Date() };
-      users.set(id, updated);
-      return updated;
-    },
-    remove: async (id) => users.delete(id),
-  };
-  return { usersRepository };
-});
+// The routes run against an in-memory repository, so these tests need no database.
+vi.mock('../src/modules/users/users.repository', async () => ({
+  usersRepository: (await import('./support/memory-users-repository')).memoryUsersRepository,
+}));
 
 const app = createApp();
 const ada = { email: 'ada@example.com', name: 'Ada Lovelace' };
 
 describe('users', () => {
-  beforeEach(() => users.clear());
+  beforeEach(() => memoryUsersRepository.reset());
 
   it('creates, reads, updates and deletes a user', async () => {
     const created = await request(app).post('/users').send(ada);
@@ -1358,6 +1474,1626 @@ process.on('uncaughtException', (error) => {
 "
 `;
 
+exports[`generated project > --framework fastify 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
+
+# Database connection string
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+",
+  "package.json": "{
+  "name": "my-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "build": "tsdown",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "postinstall": "prisma generate",
+    "prepare": "husky",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.1",
+    "@fastify/helmet": "^13.1.2",
+    "@fastify/rate-limit": "^11.2.1",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "@scalar/fastify-api-reference": "^1.73.1",
+    "fastify": "^5.12.5",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "zod": "^4.6.5",
+    "zod-openapi": "^6.0.2"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "pino-pretty": "^13.2.0",
+    "prettier": "^3.9.10",
+    "prisma": "^7.10.0",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,yml,yaml}": "prettier --write"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
+    ]
+  }
+}
+",
+  "src/app.ts": "import { randomUUID } from 'node:crypto';
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import Fastify from 'fastify';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { healthRoutes } from './modules/health/health.routes';
+import { docsRoutes } from './modules/docs/docs.routes';
+import { usersRoutes } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it with \`app.inject()\`. */
+export function createApp() {
+  const app = Fastify({
+    loggerInstance: logger,
+    // Reuse an incoming X-Request-Id (from a proxy) or create one; it's echoed back below.
+    requestIdHeader: 'x-request-id',
+    genReqId: () => randomUUID(),
+    bodyLimit: env.BODY_LIMIT_KB * 1024,
+  });
+
+  app.addHook('onRequest', async (request, reply) => {
+    reply.header('x-request-id', request.id);
+  });
+  app.register(helmet);
+  app.register(cors, { origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') });
+  app.register(rateLimit, { max: env.RATE_LIMIT_PER_MINUTE, timeWindow: '1 minute' });
+
+  app.register(healthRoutes);
+  app.register(docsRoutes);
+  app.register(usersRoutes, { prefix: '/users' });
+  app.setNotFoundHandler(notFound);
+  app.setErrorHandler(errorHandler);
+
+  return app;
+}
+",
+  "src/config/env.ts": "import { z } from 'zod';
+
+/** Every environment variable the app reads, validated once at startup. */
+const EnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  CORS_ORIGIN: z.string().default('*'),
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
+  BODY_LIMIT_KB: z.coerce.number().int().positive().default(100),
+  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+});
+
+const parsed = EnvSchema.safeParse(process.env);
+if (!parsed.success) {
+  console.error(\`Invalid environment variables:\\n\${z.prettifyError(parsed.error)}\`);
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export type Env = typeof env;
+",
+  "src/lib/logger.ts": "import { pino } from 'pino';
+import { env } from '../config/env';
+
+const defaultLevel = { development: 'debug', test: 'silent', production: 'info' } as const;
+
+/** Pretty output in development, JSON lines everywhere else. */
+export const logger = pino({
+  level: env.LOG_LEVEL ?? defaultLevel[env.NODE_ENV],
+  redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+  ...(env.NODE_ENV === 'development' && { transport: { target: 'pino-pretty' } }),
+});
+",
+  "src/lib/readiness.ts": "/** A dependency the app needs before it can serve traffic (database, cache, …). */
+export interface ReadinessCheck {
+  name: string;
+  check: () => Promise<void>;
+}
+
+const checks: ReadinessCheck[] = [];
+
+/** Register a dependency check, e.g. from the module that opens a database connection. */
+export function addReadinessCheck(name: string, check: () => Promise<void>) {
+  checks.push({ name, check });
+}
+
+let shuttingDown = false;
+
+/** Called on SIGTERM so load balancers stop sending traffic before the server closes. */
+export function markShuttingDown() {
+  shuttingDown = true;
+}
+
+/** Run every check. \`ready\` is false while shutting down or if any check fails. */
+export async function readiness() {
+  if (shuttingDown) return { ready: false, checks: { shutdown: 'shutting down' } };
+
+  const results = await Promise.allSettled(checks.map(({ check }) => check()));
+  const report = Object.fromEntries(
+    checks.map(({ name }, index) => [
+      name,
+      results[index]?.status === 'fulfilled' ? 'ok' : 'failing',
+    ]),
+  );
+  return { ready: Object.values(report).every((status) => status === 'ok'), checks: report };
+}
+",
+  "src/middleware/error-handler.ts": "import type { FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
+
+/** Throw this from a handler to send a specific status and message. */
+export class HttpError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = 'HttpError';
+  }
+}
+
+export function notFound(request: FastifyRequest, reply: FastifyReply) {
+  const path = request.url.split('?')[0];
+  void reply.status(404).send({
+    error: { message: \`Cannot \${request.method} \${path}\`, requestId: request.id },
+  });
+}
+
+/** Status of an error that is safe to show: Fastify's own 4xx (bad JSON, …) or \`expose\`. */
+function exposedStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  if ('statusCode' in error && typeof error.statusCode === 'number' && error.statusCode < 500) {
+    return error.statusCode;
+  }
+  if ('status' in error && typeof error.status === 'number' && 'expose' in error) {
+    return error.expose === true ? error.status : undefined;
+  }
+  return undefined;
+}
+
+/** One JSON error shape for everything. 5xx details are logged, never sent to the client. */
+export function errorHandler(error: unknown, request: FastifyRequest, reply: FastifyReply) {
+  let status = 500;
+  let message = 'Internal Server Error';
+  let details: unknown;
+
+  const exposed = exposedStatus(error);
+  if (error instanceof HttpError) {
+    ({ status, message, details } = error);
+  } else if (error instanceof z.ZodError) {
+    status = 400;
+    message = 'Validation failed';
+    details = z.flattenError(error);
+  } else if (exposed !== undefined && error instanceof Error) {
+    status = exposed;
+    message = error.message;
+  }
+
+  if (status >= 500) request.log.error({ err: error }, 'Request failed');
+
+  void reply.status(status).send({ error: { message, details, requestId: request.id } });
+}
+",
+  "src/modules/docs/docs.routes.ts": "import scalar from '@scalar/fastify-api-reference';
+import type { FastifyPluginAsync } from 'fastify';
+import { docsContentSecurityPolicy } from '../../openapi/docs-page';
+import { openApiDocument } from '../../openapi/document';
+
+/** The OpenAPI document at /openapi.json and interactive API docs (Scalar) at /docs. */
+export const docsRoutes: FastifyPluginAsync = async (app) => {
+  // Runs after helmet's hook (this plugin is encapsulated), so these routes get the docs CSP.
+  app.addHook('onRequest', async (_request, reply) => {
+    reply.header('content-security-policy', docsContentSecurityPolicy);
+  });
+
+  app.get('/openapi.json', async () => openApiDocument);
+
+  await app.register(scalar, { routePrefix: '/docs', configuration: { url: '/openapi.json' } });
+};
+",
+  "src/modules/health/health.routes.ts": "import type { FastifyPluginAsync } from 'fastify';
+import { readiness } from '../../lib/readiness';
+
+// Probes are frequent: keep them out of the logs and the rate limit.
+const probe = { logLevel: 'silent', config: { rateLimit: false } } as const;
+
+export const healthRoutes: FastifyPluginAsync = async (app) => {
+  /** Liveness: the process is up. Used by the Docker HEALTHCHECK. */
+  app.get('/health', probe, async () => ({ status: 'ok' }));
+
+  /** Readiness: dependencies are reachable and the app isn't shutting down. */
+  app.get('/ready', probe, async (_request, reply) => {
+    const result = await readiness();
+    return reply.status(result.ready ? 200 : 503).send(result);
+  });
+};
+",
+  "src/modules/users/users.openapi.ts": "import { z } from 'zod';
+import type { ZodOpenApiOperationObject, ZodOpenApiPathsObject } from 'zod-openapi';
+import { errorResponse, json } from '../../openapi/schemas';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+const UserSchema = z
+  .object({
+    id: z.string(),
+    email: z.email(),
+    name: z.string(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: 'User' });
+
+const byId = { path: z.object({ id: z.string() }) };
+const notFound = errorResponse('No user with this id');
+const invalid = errorResponse('Invalid request body or query');
+const emailTaken = errorResponse('Another user already has this email');
+
+const tagged = (operation: ZodOpenApiOperationObject) => ({ tags: ['users'], ...operation });
+
+/** OpenAPI paths for the users routes, added to the document in src/openapi/document.ts. */
+export const usersPaths: ZodOpenApiPathsObject = {
+  '/users': {
+    get: tagged({
+      summary: 'List users',
+      requestParams: { query: ListUsersSchema },
+      responses: {
+        '200': { description: 'A page of users', content: json(z.array(UserSchema)) },
+        '400': invalid,
+      },
+    }),
+    post: tagged({
+      summary: 'Create a user',
+      requestBody: { content: json(CreateUserSchema) },
+      responses: {
+        '201': { description: 'Created', content: json(UserSchema) },
+        '400': invalid,
+        '409': emailTaken,
+      },
+    }),
+  },
+  '/users/{id}': {
+    get: tagged({
+      summary: 'Get a user',
+      requestParams: byId,
+      responses: { '200': { description: 'The user', content: json(UserSchema) }, '404': notFound },
+    }),
+    patch: tagged({
+      summary: 'Update a user',
+      requestParams: byId,
+      requestBody: { content: json(UpdateUserSchema) },
+      responses: {
+        '200': { description: 'The updated user', content: json(UserSchema) },
+        '400': invalid,
+        '404': notFound,
+        '409': emailTaken,
+      },
+    }),
+    delete: tagged({
+      summary: 'Delete a user',
+      requestParams: byId,
+      responses: { '204': { description: 'Deleted' }, '404': notFound },
+    }),
+  },
+};
+",
+  "src/modules/users/users.repository.ts": "import { prisma } from '../../db/client';
+import { Prisma } from '../../generated/prisma/client';
+import { EmailTakenError, type UsersRepository } from './users.schema';
+
+/** P2002: unique constraint failed (the email). P2025: the record to change doesn't exist. */
+function isPrismaError(error: unknown, code: string) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
+}
+
+export const usersRepository: UsersRepository = {
+  list: ({ limit, offset }) =>
+    prisma.user.findMany({ orderBy: { createdAt: 'asc' }, take: limit, skip: offset }),
+
+  findById: (id) => prisma.user.findUnique({ where: { id } }),
+
+  async create(data) {
+    try {
+      return await prisma.user.create({ data });
+    } catch (error) {
+      if (isPrismaError(error, 'P2002')) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async update(id, data) {
+    try {
+      return await prisma.user.update({ where: { id }, data });
+    } catch (error) {
+      if (isPrismaError(error, 'P2025')) return null;
+      if (isPrismaError(error, 'P2002')) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async remove(id) {
+    const { count } = await prisma.user.deleteMany({ where: { id } });
+    return count > 0;
+  },
+};
+",
+  "src/modules/users/users.routes.ts": "import type { FastifyPluginAsync } from 'fastify';
+import { HttpError } from '../../middleware/error-handler';
+import { usersRepository } from './users.repository';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+/** CRUD routes for users. Invalid input throws a ZodError, which the error handler sends as 400. */
+export const usersRoutes: FastifyPluginAsync = async (app) => {
+  const notFound = () => new HttpError(404, 'User not found');
+
+  app.get('/', async (request) => usersRepository.list(ListUsersSchema.parse(request.query)));
+
+  app.post('/', async (request, reply) => {
+    const user = await usersRepository.create(CreateUserSchema.parse(request.body));
+    return reply.status(201).header('location', \`\${app.prefix}/\${user.id}\`).send(user);
+  });
+
+  app.get<{ Params: { id: string } }>('/:id', async (request) => {
+    const user = await usersRepository.findById(request.params.id);
+    if (!user) throw notFound();
+    return user;
+  });
+
+  app.patch<{ Params: { id: string } }>('/:id', async (request) => {
+    const data = UpdateUserSchema.parse(request.body ?? {});
+    const user = await usersRepository.update(request.params.id, data);
+    if (!user) throw notFound();
+    return user;
+  });
+
+  app.delete<{ Params: { id: string } }>('/:id', async (request, reply) => {
+    if (!(await usersRepository.remove(request.params.id))) throw notFound();
+    return reply.status(204).send();
+  });
+};
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "src/openapi/docs-page.ts": "/**
+ * The Scalar docs page loads its script from a pinned CDN version and runs a small inline
+ * script, so /docs gets this Content-Security-Policy instead of the strict default.
+ */
+export const scalarCdn = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.73.1';
+
+export const docsContentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.scalar.com",
+  "font-src 'self' data: https://fonts.scalar.com",
+  "img-src 'self' data: https:",
+  "connect-src 'self'",
+].join('; ');
+",
+  "src/openapi/document.ts": "import { z } from 'zod';
+import { createDocument } from 'zod-openapi';
+import { json } from './schemas';
+import { usersPaths } from '../modules/users/users.openapi';
+
+const ReadinessSchema = z.object({
+  ready: z.boolean(),
+  checks: z.record(z.string(), z.string()),
+});
+
+/**
+ * The OpenAPI 3.1 description of this API, built from Zod schemas. Served at /openapi.json and
+ * rendered at /docs. Add each new route's paths here.
+ */
+export const openApiDocument = createDocument({
+  openapi: '3.1.0',
+  info: { title: 'my-api', version: '0.1.0' },
+  paths: {
+    '/health': {
+      get: {
+        tags: ['health'],
+        summary: 'Liveness: the process is up',
+        responses: {
+          '200': { description: 'Up', content: json(z.object({ status: z.literal('ok') })) },
+        },
+      },
+    },
+    '/ready': {
+      get: {
+        tags: ['health'],
+        summary: 'Readiness: dependencies are reachable',
+        responses: {
+          '200': { description: 'Ready', content: json(ReadinessSchema) },
+          '503': { description: 'Not ready', content: json(ReadinessSchema) },
+        },
+      },
+    },
+    ...usersPaths,
+  },
+});
+",
+  "src/openapi/schemas.ts": "import { z } from 'zod';
+
+/** The body every error response has (see the error handler). */
+export const ErrorSchema = z
+  .object({
+    error: z.object({
+      message: z.string(),
+      requestId: z.string().optional(),
+      details: z.unknown().optional(),
+    }),
+  })
+  .meta({ id: 'Error' });
+
+/** A JSON response or request body with this schema. */
+export const json = (schema: z.ZodType) => ({ 'application/json': { schema } });
+
+/** An error response with this description. */
+export const errorResponse = (description: string) => ({
+  description,
+  content: json(ErrorSchema),
+});
+",
+  "src/server.ts": "import { createApp } from './app';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { markShuttingDown } from './lib/readiness';
+import { connectDatabase, disconnectDatabase } from './db/client';
+
+try {
+  await connectDatabase();
+} catch (error) {
+  logger.fatal({ err: error }, 'Could not connect to the database. Is it running?');
+  process.exit(1);
+}
+
+const app = createApp();
+// 0.0.0.0 so the server is reachable from outside a container; Fastify defaults to localhost.
+await app.listen({ port: env.PORT, host: '0.0.0.0' });
+// Tells PM2 (wait_ready) that this worker can take traffic.
+process.send?.('ready');
+
+let shuttingDown = false;
+
+/** Stop taking new connections, let open requests finish, close resources, then exit. */
+async function shutdown(reason: string, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Shutting down');
+  markShuttingDown();
+
+  const timer = setTimeout(() => {
+    logger.error('Open connections did not close in time, exiting');
+    process.exit(1);
+  }, env.SHUTDOWN_TIMEOUT_MS);
+  timer.unref();
+
+  let failed = false;
+  try {
+    await app.close();
+  } catch (error) {
+    failed = true;
+    logger.error({ err: error }, 'Error while closing the server');
+  }
+  try {
+    await disconnectDatabase();
+  } catch (closeError) {
+    logger.error({ err: closeError }, 'Error while closing the database');
+  }
+  process.exit(failed ? 1 : exitCode);
+}
+
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
+process.once('SIGINT', () => void shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  void shutdown('unhandledRejection', 1);
+});
+process.on('uncaughtException', (error) => {
+  logger.fatal({ err: error }, 'Uncaught exception');
+  void shutdown('uncaughtException', 1);
+});
+",
+  "tests/app.test.ts": "import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+describe('app', () => {
+  it('returns a JSON 404 with the request id', async () => {
+    const response = await createApp().inject({ method: 'GET', url: '/nope' });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().error).toMatchObject({ message: 'Cannot GET /nope' });
+    expect(response.json().error.requestId).toBe(response.headers['x-request-id']);
+  });
+
+  it('reuses an incoming X-Request-Id', async () => {
+    const response = await createApp().inject({
+      method: 'GET',
+      url: '/health',
+      headers: { 'x-request-id': 'abc-123' },
+    });
+
+    expect(response.headers['x-request-id']).toBe('abc-123');
+  });
+
+  it('sets security headers', async () => {
+    const response = await createApp().inject({ method: 'GET', url: '/health' });
+
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['x-powered-by']).toBeUndefined();
+  });
+});
+",
+  "tests/docs.test.ts": "import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+describe('API docs', () => {
+  it('GET /openapi.json serves the OpenAPI document', async () => {
+    const response = await createApp().inject('/openapi.json');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ openapi: '3.1.0', paths: { '/health': {} } });
+  });
+
+  it('GET /docs/ serves the Scalar page', async () => {
+    const response = await createApp().inject('/docs/');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toMatch(/^text\\/html/);
+    expect(response.headers['content-security-policy']).toContain("'unsafe-inline'");
+  });
+});
+",
+  "tests/health.test.ts": "import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+describe('health', () => {
+  it('GET /health responds with ok', async () => {
+    const response = await createApp().inject({ method: 'GET', url: '/health' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'ok' });
+  });
+
+  it('GET /ready reports each check', async () => {
+    const response = await createApp().inject({ method: 'GET', url: '/ready' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ ready: true });
+  });
+});
+",
+  "tests/users.test.ts": "import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app';
+import { memoryUsersRepository } from './support/memory-users-repository';
+
+// The routes run against an in-memory repository, so these tests need no database.
+vi.mock('../src/modules/users/users.repository', async () => ({
+  usersRepository: (await import('./support/memory-users-repository')).memoryUsersRepository,
+}));
+
+const app = createApp();
+const ada = { email: 'ada@example.com', name: 'Ada Lovelace' };
+
+describe('users', () => {
+  beforeEach(() => memoryUsersRepository.reset());
+
+  it('creates, reads, updates and deletes a user', async () => {
+    const created = await app.inject({ method: 'POST', url: '/users', payload: ada });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject(ada);
+    const { id } = created.json();
+    expect(created.headers.location).toBe(\`/users/\${id}\`);
+
+    expect((await app.inject({ method: 'GET', url: \`/users/\${id}\` })).json()).toMatchObject(ada);
+    expect((await app.inject({ method: 'GET', url: '/users' })).json()).toHaveLength(1);
+
+    const updated = await app.inject({
+      method: 'PATCH',
+      url: \`/users/\${id}\`,
+      payload: { name: 'Ada King' },
+    });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json().name).toBe('Ada King');
+
+    expect((await app.inject({ method: 'DELETE', url: \`/users/\${id}\` })).statusCode).toBe(204);
+    expect((await app.inject({ method: 'GET', url: \`/users/\${id}\` })).statusCode).toBe(404);
+  });
+
+  it('rejects an invalid body with 400', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/users',
+      payload: { email: 'not-an-email' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.details.fieldErrors).toHaveProperty('email');
+  });
+
+  it('rejects malformed JSON with 400', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/users',
+      headers: { 'content-type': 'application/json' },
+      payload: '{"oops"',
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('rejects a duplicate email with 409', async () => {
+    await app.inject({ method: 'POST', url: '/users', payload: ada });
+    const response = await app.inject({ method: 'POST', url: '/users', payload: ada });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.message).toMatch(/already exists/);
+  });
+
+  it('answers 404 for an unknown id', async () => {
+    expect((await app.inject({ method: 'GET', url: '/users/unknown' })).statusCode).toBe(404);
+    const patch = await app.inject({ method: 'PATCH', url: '/users/unknown', payload: {} });
+    expect(patch.statusCode).toBe(404);
+    expect((await app.inject({ method: 'DELETE', url: '/users/unknown' })).statusCode).toBe(404);
+  });
+});
+",
+}
+`;
+
+exports[`generated project > --framework hono 1`] = `
+{
+  ".env.example": "# development | test | production
+NODE_ENV=development
+
+# Port the HTTP server listens on
+PORT=3000
+
+# fatal | error | warn | info | debug | trace | silent
+LOG_LEVEL=debug
+
+# How long to wait for open requests on shutdown
+SHUTDOWN_TIMEOUT_MS=10000
+
+# Allowed CORS origins, comma-separated, or * for any
+CORS_ORIGIN=*
+
+# Requests per minute per client IP
+RATE_LIMIT_PER_MINUTE=100
+
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
+
+# Database connection string
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+",
+  "package.json": "{
+  "name": "my-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "build": "tsdown",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "postinstall": "prisma generate",
+    "prepare": "husky",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.4",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "@scalar/hono-api-reference": "^0.12.11",
+    "hono": "^4.13.13",
+    "hono-rate-limiter": "^0.5.4",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "zod": "^4.6.5",
+    "zod-openapi": "^6.0.2"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "pino-pretty": "^13.2.0",
+    "prettier": "^3.9.10",
+    "prisma": "^7.10.0",
+    "tsdown": "^0.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,yml,yaml}": "prettier --write"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
+    ]
+  }
+}
+",
+  "src/app.ts": "import { bodyLimit } from 'hono/body-limit';
+import { cors } from 'hono/cors';
+import { HTTPException } from 'hono/http-exception';
+import { requestId } from 'hono/request-id';
+import { secureHeaders } from 'hono/secure-headers';
+import { rateLimiter } from 'hono-rate-limiter';
+import { env } from './config/env';
+import { type AppEnv, createRouter } from './lib/hono';
+import { errorHandler, notFound } from './middleware/error-handler';
+import { requestLogger } from './middleware/request-logger';
+import { healthRoutes } from './modules/health/health.routes';
+import { docsRoutes } from './modules/docs/docs.routes';
+import { usersRoutes } from './modules/users/users.routes';
+
+/** Build the app without listening, so tests can drive it with \`app.request()\`. */
+export function createApp() {
+  const app = createRouter();
+
+  // Reuses an incoming X-Request-Id (from a proxy) or creates one, and echoes it back.
+  app.use(requestId());
+  app.use(requestLogger);
+  app.use(secureHeaders());
+  // Health checks stay outside CORS and rate limiting.
+  app.route('/', healthRoutes);
+
+  app.use(cors({ origin: env.CORS_ORIGIN === '*' ? '*' : env.CORS_ORIGIN.split(',') }));
+  app.use(
+    rateLimiter<AppEnv>({
+      windowMs: 60_000,
+      limit: env.RATE_LIMIT_PER_MINUTE,
+      standardHeaders: 'draft-7',
+      // c.env is the Node request under @hono/node-server; app.request() in tests has none.
+      keyGenerator: (c) =>
+        (c.env as AppEnv['Bindings'] | undefined)?.incoming.socket.remoteAddress ?? 'unknown',
+    }),
+  );
+  app.use(
+    bodyLimit({
+      maxSize: env.BODY_LIMIT_KB * 1024,
+      onError: () => {
+        throw new HTTPException(413, { message: 'Request body too large' });
+      },
+    }),
+  );
+
+  app.route('/', docsRoutes);
+  app.route('/users', usersRoutes);
+  app.notFound(notFound);
+  app.onError(errorHandler);
+
+  return app;
+}
+",
+  "src/config/env.ts": "import { z } from 'zod';
+
+/** Every environment variable the app reads, validated once at startup. */
+const EnvSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().int().positive().default(3000),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
+  SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  CORS_ORIGIN: z.string().default('*'),
+  RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
+  BODY_LIMIT_KB: z.coerce.number().int().positive().default(100),
+  DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+});
+
+const parsed = EnvSchema.safeParse(process.env);
+if (!parsed.success) {
+  console.error(\`Invalid environment variables:\\n\${z.prettifyError(parsed.error)}\`);
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export type Env = typeof env;
+",
+  "src/lib/hono.ts": "import type { HttpBindings } from '@hono/node-server';
+import { Hono } from 'hono';
+import type { RequestIdVariables } from 'hono/request-id';
+import type { Logger } from 'pino';
+
+/** Types for \`c.env\` (the Node request) and \`c.get()\` (request id and per-request logger). */
+export interface AppEnv {
+  Bindings: HttpBindings;
+  Variables: RequestIdVariables & { log: Logger };
+}
+
+/** A Hono app or router with the app's types. */
+export const createRouter = () => new Hono<AppEnv>();
+",
+  "src/lib/logger.ts": "import { pino } from 'pino';
+import { env } from '../config/env';
+
+const defaultLevel = { development: 'debug', test: 'silent', production: 'info' } as const;
+
+/** Pretty output in development, JSON lines everywhere else. */
+export const logger = pino({
+  level: env.LOG_LEVEL ?? defaultLevel[env.NODE_ENV],
+  redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+  ...(env.NODE_ENV === 'development' && { transport: { target: 'pino-pretty' } }),
+});
+",
+  "src/lib/readiness.ts": "/** A dependency the app needs before it can serve traffic (database, cache, …). */
+export interface ReadinessCheck {
+  name: string;
+  check: () => Promise<void>;
+}
+
+const checks: ReadinessCheck[] = [];
+
+/** Register a dependency check, e.g. from the module that opens a database connection. */
+export function addReadinessCheck(name: string, check: () => Promise<void>) {
+  checks.push({ name, check });
+}
+
+let shuttingDown = false;
+
+/** Called on SIGTERM so load balancers stop sending traffic before the server closes. */
+export function markShuttingDown() {
+  shuttingDown = true;
+}
+
+/** Run every check. \`ready\` is false while shutting down or if any check fails. */
+export async function readiness() {
+  if (shuttingDown) return { ready: false, checks: { shutdown: 'shutting down' } };
+
+  const results = await Promise.allSettled(checks.map(({ check }) => check()));
+  const report = Object.fromEntries(
+    checks.map(({ name }, index) => [
+      name,
+      results[index]?.status === 'fulfilled' ? 'ok' : 'failing',
+    ]),
+  );
+  return { ready: Object.values(report).every((status) => status === 'ok'), checks: report };
+}
+",
+  "src/middleware/error-handler.ts": "import type { ErrorHandler, NotFoundHandler } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { z } from 'zod';
+import type { AppEnv } from '../lib/hono';
+import { logger } from '../lib/logger';
+
+export const notFound: NotFoundHandler<AppEnv> = (c) =>
+  c.json(
+    { error: { message: \`Cannot \${c.req.method} \${c.req.path}\`, requestId: c.get('requestId') } },
+    404,
+  );
+
+/** Errors that carry a safe-to-show status and message, such as \`EmailTakenError\`. */
+function isExposedError(
+  error: unknown,
+): error is { status: ContentfulStatusCode; message: string } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof error.status === 'number' &&
+    'expose' in error &&
+    error.expose === true
+  );
+}
+
+/**
+ * One JSON error shape for everything. Throw \`HTTPException\` from a handler for a specific
+ * status. 5xx details are logged, never sent to the client.
+ */
+export const errorHandler: ErrorHandler<AppEnv> = (error, c) => {
+  let status: ContentfulStatusCode = 500;
+  let message = 'Internal Server Error';
+  let details: unknown;
+
+  if (error instanceof HTTPException) {
+    status = error.status as ContentfulStatusCode;
+    message = error.message;
+  } else if (error instanceof z.ZodError) {
+    status = 400;
+    message = 'Validation failed';
+    details = z.flattenError(error);
+  } else if (error instanceof SyntaxError) {
+    // \`c.req.json()\` throws this for a malformed body.
+    status = 400;
+    message = 'Malformed JSON';
+  } else if (isExposedError(error)) {
+    ({ status, message } = error);
+  }
+
+  if (status >= 500) (c.get('log') ?? logger).error({ err: error }, 'Request failed');
+
+  return c.json({ error: { message, details, requestId: c.get('requestId') } }, status);
+};
+",
+  "src/middleware/request-logger.ts": "import type { MiddlewareHandler } from 'hono';
+import { logger } from '../lib/logger';
+import type { AppEnv } from '../lib/hono';
+
+const QUIET_PATHS = new Set(['/health', '/ready']);
+
+/** A child logger tagged with the request id as \`c.get('log')\`, and one line per request. */
+export const requestLogger: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const log = logger.child({ reqId: c.get('requestId') });
+  c.set('log', log);
+  const start = performance.now();
+  await next();
+  if (QUIET_PATHS.has(c.req.path)) return;
+  log.info(
+    {
+      req: { method: c.req.method, url: c.req.path },
+      res: { statusCode: c.res.status },
+      responseTime: Math.round(performance.now() - start),
+    },
+    'request completed',
+  );
+};
+",
+  "src/modules/docs/docs.routes.ts": "import { Scalar } from '@scalar/hono-api-reference';
+import { createRouter } from '../../lib/hono';
+import { docsContentSecurityPolicy, scalarCdn } from '../../openapi/docs-page';
+import { openApiDocument } from '../../openapi/document';
+
+/** The OpenAPI document at /openapi.json and interactive API docs (Scalar) at /docs. */
+export const docsRoutes = createRouter()
+  .get('/openapi.json', (c) => c.json(openApiDocument))
+  .get(
+    '/docs',
+    async (c, next) => {
+      await next();
+      c.header('content-security-policy', docsContentSecurityPolicy);
+    },
+    Scalar({ url: '/openapi.json', cdn: scalarCdn }),
+  );
+",
+  "src/modules/health/health.routes.ts": "import { createRouter } from '../../lib/hono';
+import { readiness } from '../../lib/readiness';
+
+export const healthRoutes = createRouter()
+  /** Liveness: the process is up. Used by the Docker HEALTHCHECK. */
+  .get('/health', (c) => c.json({ status: 'ok' }))
+  /** Readiness: dependencies are reachable and the app isn't shutting down. */
+  .get('/ready', async (c) => {
+    const result = await readiness();
+    return c.json(result, result.ready ? 200 : 503);
+  });
+",
+  "src/modules/users/users.openapi.ts": "import { z } from 'zod';
+import type { ZodOpenApiOperationObject, ZodOpenApiPathsObject } from 'zod-openapi';
+import { errorResponse, json } from '../../openapi/schemas';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+const UserSchema = z
+  .object({
+    id: z.string(),
+    email: z.email(),
+    name: z.string(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: 'User' });
+
+const byId = { path: z.object({ id: z.string() }) };
+const notFound = errorResponse('No user with this id');
+const invalid = errorResponse('Invalid request body or query');
+const emailTaken = errorResponse('Another user already has this email');
+
+const tagged = (operation: ZodOpenApiOperationObject) => ({ tags: ['users'], ...operation });
+
+/** OpenAPI paths for the users routes, added to the document in src/openapi/document.ts. */
+export const usersPaths: ZodOpenApiPathsObject = {
+  '/users': {
+    get: tagged({
+      summary: 'List users',
+      requestParams: { query: ListUsersSchema },
+      responses: {
+        '200': { description: 'A page of users', content: json(z.array(UserSchema)) },
+        '400': invalid,
+      },
+    }),
+    post: tagged({
+      summary: 'Create a user',
+      requestBody: { content: json(CreateUserSchema) },
+      responses: {
+        '201': { description: 'Created', content: json(UserSchema) },
+        '400': invalid,
+        '409': emailTaken,
+      },
+    }),
+  },
+  '/users/{id}': {
+    get: tagged({
+      summary: 'Get a user',
+      requestParams: byId,
+      responses: { '200': { description: 'The user', content: json(UserSchema) }, '404': notFound },
+    }),
+    patch: tagged({
+      summary: 'Update a user',
+      requestParams: byId,
+      requestBody: { content: json(UpdateUserSchema) },
+      responses: {
+        '200': { description: 'The updated user', content: json(UserSchema) },
+        '400': invalid,
+        '404': notFound,
+        '409': emailTaken,
+      },
+    }),
+    delete: tagged({
+      summary: 'Delete a user',
+      requestParams: byId,
+      responses: { '204': { description: 'Deleted' }, '404': notFound },
+    }),
+  },
+};
+",
+  "src/modules/users/users.repository.ts": "import { prisma } from '../../db/client';
+import { Prisma } from '../../generated/prisma/client';
+import { EmailTakenError, type UsersRepository } from './users.schema';
+
+/** P2002: unique constraint failed (the email). P2025: the record to change doesn't exist. */
+function isPrismaError(error: unknown, code: string) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === code;
+}
+
+export const usersRepository: UsersRepository = {
+  list: ({ limit, offset }) =>
+    prisma.user.findMany({ orderBy: { createdAt: 'asc' }, take: limit, skip: offset }),
+
+  findById: (id) => prisma.user.findUnique({ where: { id } }),
+
+  async create(data) {
+    try {
+      return await prisma.user.create({ data });
+    } catch (error) {
+      if (isPrismaError(error, 'P2002')) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async update(id, data) {
+    try {
+      return await prisma.user.update({ where: { id }, data });
+    } catch (error) {
+      if (isPrismaError(error, 'P2025')) return null;
+      if (isPrismaError(error, 'P2002')) throw new EmailTakenError();
+      throw error;
+    }
+  },
+
+  async remove(id) {
+    const { count } = await prisma.user.deleteMany({ where: { id } });
+    return count > 0;
+  },
+};
+",
+  "src/modules/users/users.routes.ts": "import { HTTPException } from 'hono/http-exception';
+import { createRouter } from '../../lib/hono';
+import { usersRepository } from './users.repository';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+const notFound = () => new HTTPException(404, { message: 'User not found' });
+
+/** CRUD routes for users. Invalid input throws a ZodError, which the error handler sends as 400. */
+export const usersRoutes = createRouter()
+  .get('/', async (c) => c.json(await usersRepository.list(ListUsersSchema.parse(c.req.query()))))
+  .post('/', async (c) => {
+    const user = await usersRepository.create(CreateUserSchema.parse(await c.req.json()));
+    c.header('location', \`\${c.req.path.replace(/\\/$/, '')}/\${user.id}\`);
+    return c.json(user, 201);
+  })
+  .get('/:id', async (c) => {
+    const user = await usersRepository.findById(c.req.param('id'));
+    if (!user) throw notFound();
+    return c.json(user);
+  })
+  .patch('/:id', async (c) => {
+    const data = UpdateUserSchema.parse(await c.req.json());
+    const user = await usersRepository.update(c.req.param('id'), data);
+    if (!user) throw notFound();
+    return c.json(user);
+  })
+  .delete('/:id', async (c) => {
+    if (!(await usersRepository.remove(c.req.param('id')))) throw notFound();
+    return c.body(null, 204);
+  });
+",
+  "src/modules/users/users.schema.ts": "import { z } from 'zod';
+
+/** Request body for creating a user. */
+export const CreateUserSchema = z.object({
+  email: z.email().toLowerCase(),
+  name: z.string().trim().min(1).max(100),
+});
+
+/** Request body for updating a user: any subset of the create fields. */
+export const UpdateUserSchema = CreateUserSchema.partial();
+
+/** Query string for listing users. */
+export const ListUsersSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export type CreateUser = z.infer<typeof CreateUserSchema>;
+export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type ListUsers = z.infer<typeof ListUsersSchema>;
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Storage for users. \`users.repository.ts\` implements it for the chosen database. */
+export interface UsersRepository {
+  list(query: ListUsers): Promise<User[]>;
+  findById(id: string): Promise<User | null>;
+  /** Throws \`EmailTakenError\` if the email is already used. */
+  create(data: CreateUser): Promise<User>;
+  /** Returns null if there is no such user. Throws \`EmailTakenError\` on a duplicate email. */
+  update(id: string, data: UpdateUser): Promise<User | null>;
+  /** Returns false if there is no such user. */
+  remove(id: string): Promise<boolean>;
+}
+
+/** Another user already has this email. The error handler sends it as a 409. */
+export class EmailTakenError extends Error {
+  readonly status = 409;
+  readonly expose = true;
+
+  constructor() {
+    super('A user with this email already exists');
+    this.name = 'EmailTakenError';
+  }
+}
+",
+  "src/openapi/docs-page.ts": "/**
+ * The Scalar docs page loads its script from a pinned CDN version and runs a small inline
+ * script, so /docs gets this Content-Security-Policy instead of the strict default.
+ */
+export const scalarCdn = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.73.1';
+
+export const docsContentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.scalar.com",
+  "font-src 'self' data: https://fonts.scalar.com",
+  "img-src 'self' data: https:",
+  "connect-src 'self'",
+].join('; ');
+",
+  "src/openapi/document.ts": "import { z } from 'zod';
+import { createDocument } from 'zod-openapi';
+import { json } from './schemas';
+import { usersPaths } from '../modules/users/users.openapi';
+
+const ReadinessSchema = z.object({
+  ready: z.boolean(),
+  checks: z.record(z.string(), z.string()),
+});
+
+/**
+ * The OpenAPI 3.1 description of this API, built from Zod schemas. Served at /openapi.json and
+ * rendered at /docs. Add each new route's paths here.
+ */
+export const openApiDocument = createDocument({
+  openapi: '3.1.0',
+  info: { title: 'my-api', version: '0.1.0' },
+  paths: {
+    '/health': {
+      get: {
+        tags: ['health'],
+        summary: 'Liveness: the process is up',
+        responses: {
+          '200': { description: 'Up', content: json(z.object({ status: z.literal('ok') })) },
+        },
+      },
+    },
+    '/ready': {
+      get: {
+        tags: ['health'],
+        summary: 'Readiness: dependencies are reachable',
+        responses: {
+          '200': { description: 'Ready', content: json(ReadinessSchema) },
+          '503': { description: 'Not ready', content: json(ReadinessSchema) },
+        },
+      },
+    },
+    ...usersPaths,
+  },
+});
+",
+  "src/openapi/schemas.ts": "import { z } from 'zod';
+
+/** The body every error response has (see the error handler). */
+export const ErrorSchema = z
+  .object({
+    error: z.object({
+      message: z.string(),
+      requestId: z.string().optional(),
+      details: z.unknown().optional(),
+    }),
+  })
+  .meta({ id: 'Error' });
+
+/** A JSON response or request body with this schema. */
+export const json = (schema: z.ZodType) => ({ 'application/json': { schema } });
+
+/** An error response with this description. */
+export const errorResponse = (description: string) => ({
+  description,
+  content: json(ErrorSchema),
+});
+",
+  "src/server.ts": "import { serve } from '@hono/node-server';
+import { createApp } from './app';
+import { env } from './config/env';
+import { logger } from './lib/logger';
+import { markShuttingDown } from './lib/readiness';
+import { connectDatabase, disconnectDatabase } from './db/client';
+
+try {
+  await connectDatabase();
+} catch (error) {
+  logger.fatal({ err: error }, 'Could not connect to the database. Is it running?');
+  process.exit(1);
+}
+
+const server = serve({ fetch: createApp().fetch, port: env.PORT }, () => {
+  logger.info(\`Listening on http://localhost:\${env.PORT}\`);
+  // Tells PM2 (wait_ready) that this worker can take traffic.
+  process.send?.('ready');
+});
+
+let shuttingDown = false;
+
+/** Stop taking new connections, let open requests finish, close resources, then exit. */
+function shutdown(reason: string, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Shutting down');
+  markShuttingDown();
+
+  const timer = setTimeout(() => {
+    logger.error('Open connections did not close in time, exiting');
+    process.exit(1);
+  }, env.SHUTDOWN_TIMEOUT_MS);
+  timer.unref();
+
+  server.close(async (error) => {
+    try {
+      await disconnectDatabase();
+    } catch (closeError) {
+      logger.error({ err: closeError }, 'Error while closing the database');
+    }
+    if (error) logger.error({ err: error }, 'Error while closing the server');
+    process.exit(error ? 1 : exitCode);
+  });
+}
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ err: reason }, 'Unhandled promise rejection');
+  shutdown('unhandledRejection', 1);
+});
+process.on('uncaughtException', (error) => {
+  logger.fatal({ err: error }, 'Uncaught exception');
+  shutdown('uncaughtException', 1);
+});
+",
+  "tests/app.test.ts": "import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+describe('app', () => {
+  it('returns a JSON 404 with the request id', async () => {
+    const response = await createApp().request('/nope');
+    const body = (await response.json()) as { error: { message: string; requestId: string } };
+
+    expect(response.status).toBe(404);
+    expect(body.error).toMatchObject({ message: 'Cannot GET /nope' });
+    expect(body.error.requestId).toBe(response.headers.get('x-request-id'));
+  });
+
+  it('reuses an incoming X-Request-Id', async () => {
+    const response = await createApp().request('/health', {
+      headers: { 'x-request-id': 'abc-123' },
+    });
+
+    expect(response.headers.get('x-request-id')).toBe('abc-123');
+  });
+
+  it('sets security headers', async () => {
+    const response = await createApp().request('/health');
+
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(response.headers.get('x-powered-by')).toBeNull();
+  });
+});
+",
+  "tests/docs.test.ts": "import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+describe('API docs', () => {
+  it('GET /openapi.json serves the OpenAPI document', async () => {
+    const response = await createApp().request('/openapi.json');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ openapi: '3.1.0', paths: { '/health': {} } });
+  });
+
+  it('GET /docs serves the Scalar page', async () => {
+    const response = await createApp().request('/docs');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toMatch(/^text\\/html/);
+    expect(response.headers.get('content-security-policy')).toContain('cdn.jsdelivr.net');
+  });
+});
+",
+  "tests/health.test.ts": "import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+describe('health', () => {
+  it('GET /health responds with ok', async () => {
+    const response = await createApp().request('/health');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'ok' });
+  });
+
+  it('GET /ready reports each check', async () => {
+    const response = await createApp().request('/ready');
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ready: true });
+  });
+});
+",
+  "tests/users.test.ts": "import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app';
+import type { User } from '../src/modules/users/users.schema';
+import { memoryUsersRepository } from './support/memory-users-repository';
+
+// The routes run against an in-memory repository, so these tests need no database.
+vi.mock('../src/modules/users/users.repository', async () => ({
+  usersRepository: (await import('./support/memory-users-repository')).memoryUsersRepository,
+}));
+
+const app = createApp();
+const ada = { email: 'ada@example.com', name: 'Ada Lovelace' };
+
+interface ErrorBody {
+  error: { message: string; details?: { fieldErrors: Record<string, string[]> } };
+}
+
+/** Response bodies are JSON: users as plain objects, failures as \`{ error }\`. */
+const read = async <T>(response: Response) => (await response.json()) as T;
+
+function send(method: string, path: string, body?: unknown) {
+  return app.request(path, {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+}
+
+describe('users', () => {
+  beforeEach(() => memoryUsersRepository.reset());
+
+  it('creates, reads, updates and deletes a user', async () => {
+    const created = await send('POST', '/users', ada);
+    expect(created.status).toBe(201);
+    const user = await read<User>(created);
+    expect(user).toMatchObject(ada);
+    expect(created.headers.get('location')).toBe(\`/users/\${user.id}\`);
+
+    expect(await read<User>(await app.request(\`/users/\${user.id}\`))).toMatchObject(ada);
+    expect(await read<User[]>(await app.request('/users'))).toHaveLength(1);
+
+    const updated = await send('PATCH', \`/users/\${user.id}\`, { name: 'Ada King' });
+    expect(updated.status).toBe(200);
+    expect((await read<User>(updated)).name).toBe('Ada King');
+
+    expect((await app.request(\`/users/\${user.id}\`, { method: 'DELETE' })).status).toBe(204);
+    expect((await app.request(\`/users/\${user.id}\`)).status).toBe(404);
+  });
+
+  it('rejects an invalid body with 400', async () => {
+    const response = await send('POST', '/users', { email: 'not-an-email' });
+
+    expect(response.status).toBe(400);
+    expect((await read<ErrorBody>(response)).error.details?.fieldErrors).toHaveProperty('email');
+  });
+
+  it('rejects malformed JSON with 400', async () => {
+    expect((await send('POST', '/users', '{"oops"')).status).toBe(400);
+  });
+
+  it('rejects a duplicate email with 409', async () => {
+    await send('POST', '/users', ada);
+    const response = await send('POST', '/users', ada);
+
+    expect(response.status).toBe(409);
+    expect((await read<ErrorBody>(response)).error.message).toMatch(/already exists/);
+  });
+
+  it('answers 404 for an unknown id', async () => {
+    expect((await app.request('/users/unknown')).status).toBe(404);
+    expect((await send('PATCH', '/users/unknown', {})).status).toBe(404);
+    expect((await app.request('/users/unknown', { method: 'DELETE' })).status).toBe(404);
+  });
+});
+",
+}
+`;
+
+exports[`generated project > --lint biome 1`] = `
+"{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  // Skip whatever .gitignore skips (dist, coverage, generated clients).
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": [
+      // Everything except lockfiles and generated code.
+      "**",
+      "!drizzle",
+      "!pnpm-lock.yaml"
+    ]
+  },
+  "formatter": { "indentStyle": "space", "lineWidth": 100 },
+  "javascript": { "formatter": { "quoteStyle": "single" } },
+  // The recommended rules; \`biome check --write\` also sorts imports.
+  "linter": { "enabled": true }
+}
+"
+`;
+
 exports[`generated project > --yes defaults (express, vitest, eslint, pnpm, node 24) 1`] = `
 {
   "features": [
@@ -1365,8 +3101,11 @@ exports[`generated project > --yes defaults (express, vitest, eslint, pnpm, node
     "framework-express",
     "db-prisma",
     "example-users",
+    "openapi",
     "testing-vitest",
     "lint-eslint",
+    "git-hooks",
+    "ci-github",
     "docker",
     "pm2",
   ],
@@ -1414,11 +3153,50 @@ CORS_ORIGIN=*
 # Requests per minute per client IP
 RATE_LIMIT_PER_MINUTE=100
 
-# Largest accepted JSON request body
-BODY_LIMIT=100kb
+# Largest accepted request body, in kilobytes
+BODY_LIMIT_KB=100
 
 # Database connection string
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+",
+    ".github/workflows/ci.yml": "name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Installs the pnpm version named in package.json "packageManager".
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 ",
     ".gitignore": "node_modules/
 dist/
@@ -1427,6 +3205,10 @@ coverage/
 *.log
 .DS_Store
 /src/generated/
+",
+    ".husky/commit-msg": "pnpm exec commitlint --edit "$1"
+",
+    ".husky/pre-commit": "pnpm exec lint-staged
 ",
     ".nvmrc": "24
 ",
@@ -1523,7 +3305,11 @@ Prisma with PostgreSQL. The schema is \`prisma/schema.prisma\`. After changing i
 - \`POST /users\`: create one from \`{ "email", "name" }\`
 - \`GET /users/:id\`, \`PATCH /users/:id\`, \`DELETE /users/:id\`
 
-Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the \`usersRouter\` lines in \`src/app.ts\`.
+Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the users lines in \`src/app.ts\`.
+
+## API docs
+
+The OpenAPI 3.1 document is built from Zod schemas in \`src/openapi/document.ts\` and served at \`/openapi.json\`. Browse it at \`http://localhost:3000/docs\` (Scalar). When you add a route, add its paths to the document too.
 
 ## Docker
 
@@ -1541,6 +3327,9 @@ For a VM or bare-metal server. Build, then start one worker per CPU in cluster m
 npm install --global pm2@7.0.4
 pm2 start ecosystem.config.cjs
 \`\`\`
+",
+    "commitlint.config.js": "// Commit messages follow Conventional Commits, e.g. "feat: add users search" or "fix(db): retry".
+export default { extends: ['@commitlint/config-conventional'] };
 ",
     "compose.yaml": "services:
   app:
@@ -1660,6 +3449,7 @@ export default tseslint.config(
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "postinstall": "prisma generate",
+    "prepare": "husky",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -1669,6 +3459,7 @@ export default tseslint.config(
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "@scalar/express-api-reference": "^0.10.28",
     "cors": "^2.8.6",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
@@ -1676,9 +3467,12 @@ export default tseslint.config(
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "zod-openapi": "^6.0.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -1689,6 +3483,8 @@ export default tseslint.config(
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
     "prisma": "^7.10.0",
@@ -1698,6 +3494,13 @@ export default tseslint.config(
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,yml,yaml}": "prettier --write"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -1767,6 +3570,7 @@ import { env } from './config/env';
 import { logger } from './lib/logger';
 import { errorHandler, notFound } from './middleware/error-handler';
 import { healthRouter } from './modules/health/health.routes';
+import { docsRouter } from './modules/docs/docs.routes';
 import { usersRouter } from './modules/users/users.routes';
 
 /** Build the app without listening, so tests can drive it directly. */
@@ -1798,8 +3602,9 @@ export function createApp() {
       legacyHeaders: false,
     }),
   );
-  app.use(express.json({ limit: env.BODY_LIMIT }));
+  app.use(express.json({ limit: env.BODY_LIMIT_KB * 1024 }));
 
+  app.use(docsRouter);
   app.use('/users', usersRouter);
   app.use(notFound);
   app.use(errorHandler);
@@ -1817,7 +3622,7 @@ const EnvSchema = z.object({
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   CORS_ORIGIN: z.string().default('*'),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),
-  BODY_LIMIT: z.string().default('100kb'),
+  BODY_LIMIT_KB: z.coerce.number().int().positive().default(100),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
 });
 
@@ -1951,6 +3756,28 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   res.status(status).json({ error: { message, details, requestId: req.id } });
 };
 ",
+    "src/modules/docs/docs.routes.ts": "import { apiReference } from '@scalar/express-api-reference';
+import { Router } from 'express';
+import { docsContentSecurityPolicy, scalarCdn } from '../../openapi/docs-page';
+import { openApiDocument } from '../../openapi/document';
+
+export const docsRouter = Router();
+
+/** The OpenAPI document. */
+docsRouter.get('/openapi.json', (_req, res) => {
+  res.json(openApiDocument);
+});
+
+/** Interactive API docs (Scalar), rendered from /openapi.json. */
+docsRouter.use(
+  '/docs',
+  (_req, res, next) => {
+    res.setHeader('Content-Security-Policy', docsContentSecurityPolicy);
+    next();
+  },
+  apiReference({ url: '/openapi.json', cdn: scalarCdn }),
+);
+",
     "src/modules/health/health.routes.ts": "import { Router } from 'express';
 import { readiness } from '../../lib/readiness';
 
@@ -1966,6 +3793,74 @@ healthRouter.get('/ready', async (_req, res) => {
   const result = await readiness();
   res.status(result.ready ? 200 : 503).json(result);
 });
+",
+    "src/modules/users/users.openapi.ts": "import { z } from 'zod';
+import type { ZodOpenApiOperationObject, ZodOpenApiPathsObject } from 'zod-openapi';
+import { errorResponse, json } from '../../openapi/schemas';
+import { CreateUserSchema, ListUsersSchema, UpdateUserSchema } from './users.schema';
+
+const UserSchema = z
+  .object({
+    id: z.string(),
+    email: z.email(),
+    name: z.string(),
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+  })
+  .meta({ id: 'User' });
+
+const byId = { path: z.object({ id: z.string() }) };
+const notFound = errorResponse('No user with this id');
+const invalid = errorResponse('Invalid request body or query');
+const emailTaken = errorResponse('Another user already has this email');
+
+const tagged = (operation: ZodOpenApiOperationObject) => ({ tags: ['users'], ...operation });
+
+/** OpenAPI paths for the users routes, added to the document in src/openapi/document.ts. */
+export const usersPaths: ZodOpenApiPathsObject = {
+  '/users': {
+    get: tagged({
+      summary: 'List users',
+      requestParams: { query: ListUsersSchema },
+      responses: {
+        '200': { description: 'A page of users', content: json(z.array(UserSchema)) },
+        '400': invalid,
+      },
+    }),
+    post: tagged({
+      summary: 'Create a user',
+      requestBody: { content: json(CreateUserSchema) },
+      responses: {
+        '201': { description: 'Created', content: json(UserSchema) },
+        '400': invalid,
+        '409': emailTaken,
+      },
+    }),
+  },
+  '/users/{id}': {
+    get: tagged({
+      summary: 'Get a user',
+      requestParams: byId,
+      responses: { '200': { description: 'The user', content: json(UserSchema) }, '404': notFound },
+    }),
+    patch: tagged({
+      summary: 'Update a user',
+      requestParams: byId,
+      requestBody: { content: json(UpdateUserSchema) },
+      responses: {
+        '200': { description: 'The updated user', content: json(UserSchema) },
+        '400': invalid,
+        '404': notFound,
+        '409': emailTaken,
+      },
+    }),
+    delete: tagged({
+      summary: 'Delete a user',
+      requestParams: byId,
+      responses: { '204': { description: 'Deleted' }, '404': notFound },
+    }),
+  },
+};
 ",
     "src/modules/users/users.repository.ts": "import { prisma } from '../../db/client';
 import { Prisma } from '../../generated/prisma/client';
@@ -2095,6 +3990,84 @@ export class EmailTakenError extends Error {
   }
 }
 ",
+    "src/openapi/docs-page.ts": "/**
+ * The Scalar docs page loads its script from a pinned CDN version and runs a small inline
+ * script, so /docs gets this Content-Security-Policy instead of the strict default.
+ */
+export const scalarCdn = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.73.1';
+
+export const docsContentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.scalar.com",
+  "font-src 'self' data: https://fonts.scalar.com",
+  "img-src 'self' data: https:",
+  "connect-src 'self'",
+].join('; ');
+",
+    "src/openapi/document.ts": "import { z } from 'zod';
+import { createDocument } from 'zod-openapi';
+import { json } from './schemas';
+import { usersPaths } from '../modules/users/users.openapi';
+
+const ReadinessSchema = z.object({
+  ready: z.boolean(),
+  checks: z.record(z.string(), z.string()),
+});
+
+/**
+ * The OpenAPI 3.1 description of this API, built from Zod schemas. Served at /openapi.json and
+ * rendered at /docs. Add each new route's paths here.
+ */
+export const openApiDocument = createDocument({
+  openapi: '3.1.0',
+  info: { title: 'my-api', version: '0.1.0' },
+  paths: {
+    '/health': {
+      get: {
+        tags: ['health'],
+        summary: 'Liveness: the process is up',
+        responses: {
+          '200': { description: 'Up', content: json(z.object({ status: z.literal('ok') })) },
+        },
+      },
+    },
+    '/ready': {
+      get: {
+        tags: ['health'],
+        summary: 'Readiness: dependencies are reachable',
+        responses: {
+          '200': { description: 'Ready', content: json(ReadinessSchema) },
+          '503': { description: 'Not ready', content: json(ReadinessSchema) },
+        },
+      },
+    },
+    ...usersPaths,
+  },
+});
+",
+    "src/openapi/schemas.ts": "import { z } from 'zod';
+
+/** The body every error response has (see the error handler). */
+export const ErrorSchema = z
+  .object({
+    error: z.object({
+      message: z.string(),
+      requestId: z.string().optional(),
+      details: z.unknown().optional(),
+    }),
+  })
+  .meta({ id: 'Error' });
+
+/** A JSON response or request body with this schema. */
+export const json = (schema: z.ZodType) => ({ 'application/json': { schema } });
+
+/** An error response with this description. */
+export const errorResponse = (description: string) => ({
+  description,
+  content: json(ErrorSchema),
+});
+",
     "src/server.ts": "import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './lib/logger';
@@ -2187,6 +4160,27 @@ describe('app', () => {
   });
 });
 ",
+    "tests/docs.test.ts": "import request from 'supertest';
+import { describe, expect, it } from 'vitest';
+import { createApp } from '../src/app';
+
+describe('API docs', () => {
+  it('GET /openapi.json serves the OpenAPI document', async () => {
+    const response = await request(createApp()).get('/openapi.json');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ openapi: '3.1.0', paths: { '/health': {} } });
+  });
+
+  it('GET /docs serves the Scalar page', async () => {
+    const response = await request(createApp()).get('/docs');
+
+    expect(response.status).toBe(200);
+    expect(response.type).toBe('text/html');
+    expect(response.headers['content-security-policy']).toContain('cdn.jsdelivr.net');
+  });
+});
+",
     "tests/health.test.ts": "import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
@@ -2207,51 +4201,59 @@ describe('health', () => {
   });
 });
 ",
-    "tests/users.test.ts": "import { randomUUID } from 'node:crypto';
-import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createApp } from '../src/app';
+    "tests/support/memory-users-repository.ts": "import { randomUUID } from 'node:crypto';
 import {
   EmailTakenError,
   type User,
   type UsersRepository,
-} from '../src/modules/users/users.schema';
+} from '../../src/modules/users/users.schema';
 
-// The routes are tested against an in-memory repository, so these tests need no database.
 const users = new Map<string, User>();
 
-vi.mock('../src/modules/users/users.repository', () => {
-  const emailTaken = (email: string | undefined, id?: string) =>
-    [...users.values()].some((user) => user.email === email && user.id !== id);
+const emailTaken = (email: string | undefined, id?: string) =>
+  [...users.values()].some((user) => user.email === email && user.id !== id);
 
-  const usersRepository: UsersRepository = {
-    list: async ({ limit, offset }) => [...users.values()].slice(offset, offset + limit),
-    findById: async (id) => users.get(id) ?? null,
-    create: async (data) => {
-      if (emailTaken(data.email)) throw new EmailTakenError();
-      const now = new Date();
-      const user = { id: randomUUID(), ...data, createdAt: now, updatedAt: now };
-      users.set(user.id, user);
-      return user;
-    },
-    update: async (id, data) => {
-      const user = users.get(id);
-      if (!user) return null;
-      if (emailTaken(data.email, id)) throw new EmailTakenError();
-      const updated = { ...user, ...data, updatedAt: new Date() };
-      users.set(id, updated);
-      return updated;
-    },
-    remove: async (id) => users.delete(id),
-  };
-  return { usersRepository };
-});
+/**
+ * An in-memory \`UsersRepository\`, so route tests run without a database. Tests swap it in with
+ * \`vi.mock('../src/modules/users/users.repository', ...)\` and call \`reset()\` between tests.
+ */
+export const memoryUsersRepository: UsersRepository & { reset(): void } = {
+  reset: () => users.clear(),
+  list: async ({ limit, offset }) => [...users.values()].slice(offset, offset + limit),
+  findById: async (id) => users.get(id) ?? null,
+  async create(data) {
+    if (emailTaken(data.email)) throw new EmailTakenError();
+    const now = new Date();
+    const user = { id: randomUUID(), ...data, createdAt: now, updatedAt: now };
+    users.set(user.id, user);
+    return user;
+  },
+  async update(id, data) {
+    const user = users.get(id);
+    if (!user) return null;
+    if (emailTaken(data.email, id)) throw new EmailTakenError();
+    const updated = { ...user, ...data, updatedAt: new Date() };
+    users.set(id, updated);
+    return updated;
+  },
+  remove: async (id) => users.delete(id),
+};
+",
+    "tests/users.test.ts": "import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app';
+import { memoryUsersRepository } from './support/memory-users-repository';
+
+// The routes run against an in-memory repository, so these tests need no database.
+vi.mock('../src/modules/users/users.repository', async () => ({
+  usersRepository: (await import('./support/memory-users-repository')).memoryUsersRepository,
+}));
 
 const app = createApp();
 const ada = { email: 'ada@example.com', name: 'Ada Lovelace' };
 
 describe('users', () => {
-  beforeEach(() => users.clear());
+  beforeEach(() => memoryUsersRepository.reset());
 
   it('creates, reads, updates and deletes a user', async () => {
     const created = await request(app).post('/users').send(ada);
@@ -2343,6 +4345,161 @@ export default defineConfig({
 }
 `;
 
+exports[`generated project > CI workflow with bun 1`] = `
+"name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run format:check
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run build
+"
+`;
+
+exports[`generated project > CI workflow with npm 1`] = `
+"name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+"
+`;
+
+exports[`generated project > CI workflow with pnpm 1`] = `
+"name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Installs the pnpm version named in package.json "packageManager".
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+"
+`;
+
+exports[`generated project > OpenAPI document with the users paths 1`] = `
+"import { z } from 'zod';
+import { createDocument } from 'zod-openapi';
+import { json } from './schemas';
+import { usersPaths } from '../modules/users/users.openapi';
+
+const ReadinessSchema = z.object({
+  ready: z.boolean(),
+  checks: z.record(z.string(), z.string()),
+});
+
+/**
+ * The OpenAPI 3.1 description of this API, built from Zod schemas. Served at /openapi.json and
+ * rendered at /docs. Add each new route's paths here.
+ */
+export const openApiDocument = createDocument({
+  openapi: '3.1.0',
+  info: { title: 'my-api', version: '0.1.0' },
+  paths: {
+    '/health': {
+      get: {
+        tags: ['health'],
+        summary: 'Liveness: the process is up',
+        responses: {
+          '200': { description: 'Up', content: json(z.object({ status: z.literal('ok') })) },
+        },
+      },
+    },
+    '/ready': {
+      get: {
+        tags: ['health'],
+        summary: 'Readiness: dependencies are reachable',
+        responses: {
+          '200': { description: 'Ready', content: json(ReadinessSchema) },
+          '503': { description: 'Not ready', content: json(ReadinessSchema) },
+        },
+      },
+    },
+    ...usersPaths,
+  },
+});
+"
+`;
+
 exports[`generated project > drizzle without the example module 1`] = `
 "// Define your tables here, then run the db:generate script to create a migration.
 // See https://orm.drizzle.team/docs/sql-schema-declaration
@@ -2410,6 +4567,7 @@ exports[`generated project > npm on node 22 1`] = `
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "postinstall": "prisma generate",
+    "prepare": "husky",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -2419,6 +4577,7 @@ exports[`generated project > npm on node 22 1`] = `
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "@scalar/express-api-reference": "^0.10.28",
     "cors": "^2.8.6",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
@@ -2426,9 +4585,12 @@ exports[`generated project > npm on node 22 1`] = `
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "zod-openapi": "^6.0.2"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
     "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -2439,6 +4601,8 @@ exports[`generated project > npm on node 22 1`] = `
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
     "prisma": "^7.10.0",
@@ -2448,6 +4612,13 @@ exports[`generated project > npm on node 22 1`] = `
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.3"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,jsonc,md,yml,yaml}": "prettier --write"
   }
 }
 "
@@ -2500,7 +4671,11 @@ Prisma with PostgreSQL. The schema is \`prisma/schema.prisma\`. After changing i
 - \`POST /users\`: create one from \`{ "email", "name" }\`
 - \`GET /users/:id\`, \`PATCH /users/:id\`, \`DELETE /users/:id\`
 
-Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the \`usersRouter\` lines in \`src/app.ts\`.
+Copy it as a starting point for your own modules. To remove it, delete \`src/modules/users\`, \`tests/users.test.ts\` and the users lines in \`src/app.ts\`.
+
+## API docs
+
+The OpenAPI 3.1 document is built from Zod schemas in \`src/openapi/document.ts\` and served at \`/openapi.json\`. Browse it at \`http://localhost:3000/docs\` (Scalar). When you add a route, add its paths to the document too.
 
 ## Docker
 

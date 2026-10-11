@@ -1,0 +1,14 @@
+/**
+ * The Scalar docs page loads its script from a pinned CDN version and runs a small inline
+ * script, so /docs gets this Content-Security-Policy instead of the strict default.
+ */
+export const scalarCdn = 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@<%= it.scalarVersion %>';
+
+export const docsContentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.scalar.com",
+  "font-src 'self' data: https://fonts.scalar.com",
+  "img-src 'self' data: https:",
+  "connect-src 'self'",
+].join('; ');

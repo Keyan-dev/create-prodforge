@@ -46,6 +46,7 @@ export const dbDrizzle: Feature = {
 
     // drizzle-kit writes its snapshots as tab-indented JSON; leave generated files alone.
     ctx.inject('.prettierignore', 'ignore', 'drizzle/', { optional: true });
+    ctx.inject('biome.jsonc', 'ignore', '"!drizzle",', { optional: true });
     const run = runScript(cfg);
     readmeSetup(ctx, 'postgres', 'db:deploy');
     ctx.inject(

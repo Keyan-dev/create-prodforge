@@ -35,15 +35,23 @@ jobs:
           test -f smoke-app/src/app.ts && test -f smoke-app/.gitignore
 
   e2e:
-    # Generate → install → lint/test/build/run for real (PLAN.md §6), one job per database.
-    name: e2e (${{ matrix.db }})
+    # Generate → install → lint/test/build/run for real (PLAN.md §6): every framework × database
+    # with ESLint, plus Biome on a couple of them. One job per case.
+    name: e2e (${{ matrix.framework }}, ${{ matrix.db }}, ${{ matrix.lint }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        framework: [express, fastify, hono]
         db: [prisma, drizzle, mongoose, none]
+        lint: [eslint]
+        include:
+          - { framework: express, db: mongoose, lint: biome }
+          - { framework: hono, db: drizzle, lint: biome }
     env:
+      PRODFORGE_E2E_FRAMEWORK: ${{ matrix.framework }}
       PRODFORGE_E2E_DB: ${{ matrix.db }}
+      PRODFORGE_E2E_LINT: ${{ matrix.lint }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4

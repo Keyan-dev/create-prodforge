@@ -1,6 +1,7 @@
 import type { Feature } from '../../core/feature';
 import { featureFiles } from '../../core/templates';
 import { pick } from '../../core/versions';
+import { addHttpEnv, hasUsersExample } from '../shared/http';
 
 /**
  * Express 5 app: `createApp()` factory with request logging and IDs, helmet, CORS, rate
@@ -17,23 +18,24 @@ export const frameworkExpress: Feature = {
       .addDeps(pick('cors', 'express', 'express-rate-limit', 'helmet', 'pino-http'))
       .addDevDeps(pick('@types/cors', '@types/express', '@types/supertest', 'supertest'));
 
-    ctx.env.add('CORS_ORIGIN', '*', 'Allowed CORS origins, comma-separated, or * for any');
-    ctx.env.add('RATE_LIMIT_PER_MINUTE', '100', 'Requests per minute per client IP');
-    ctx.env.add('BODY_LIMIT', '100kb', 'Largest accepted JSON request body');
-    ctx.inject(
-      'src/config/env.ts',
-      'env',
-      [
-        "CORS_ORIGIN: z.string().default('*'),",
-        'RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(100),',
-        "BODY_LIMIT: z.string().default('100kb'),",
-      ].join('\n'),
-    );
+    addHttpEnv(ctx);
 
     await ctx.files.copyDir(featureFiles('framework-express'));
 
+    // /openapi.json and the Scalar docs page (see the openapi feature).
+    if (ctx.cfg.openapi) {
+      ctx.pkg.addDeps(pick('@scalar/express-api-reference'));
+      await ctx.files.copyDir(featureFiles('framework-express', 'files-openapi'));
+      ctx.inject(
+        'src/app.ts',
+        'imports',
+        "import { docsRouter } from './modules/docs/docs.routes';",
+      );
+      ctx.inject('src/app.ts', 'routes', 'app.use(docsRouter);');
+    }
+
     // Routes and tests for the example users module (see the example-users feature).
-    if (ctx.cfg.example && ctx.cfg.db !== 'none') {
+    if (hasUsersExample(ctx)) {
       await ctx.files.copyDir(featureFiles('framework-express', 'files-example'));
       ctx.inject(
         'src/app.ts',

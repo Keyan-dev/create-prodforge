@@ -1,0 +1,40 @@
+import { z } from 'zod';
+import { createDocument } from 'zod-openapi';
+import { json } from './schemas';
+// @slot:imports
+
+const ReadinessSchema = z.object({
+  ready: z.boolean(),
+  checks: z.record(z.string(), z.string()),
+});
+
+/**
+ * The OpenAPI 3.1 description of this API, built from Zod schemas. Served at /openapi.json and
+ * rendered at /docs. Add each new route's paths here.
+ */
+export const openApiDocument = createDocument({
+  openapi: '3.1.0',
+  info: { title: '<%= it.cfg.name %>', version: '0.1.0' },
+  paths: {
+    '/health': {
+      get: {
+        tags: ['health'],
+        summary: 'Liveness: the process is up',
+        responses: {
+          '200': { description: 'Up', content: json(z.object({ status: z.literal('ok') })) },
+        },
+      },
+    },
+    '/ready': {
+      get: {
+        tags: ['health'],
+        summary: 'Readiness: dependencies are reachable',
+        responses: {
+          '200': { description: 'Ready', content: json(ReadinessSchema) },
+          '503': { description: 'Not ready', content: json(ReadinessSchema) },
+        },
+      },
+    },
+    // @slot:paths
+  },
+});

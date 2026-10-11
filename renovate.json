@@ -19,6 +19,13 @@
       "managerFilePatterns": ["/^src/core/versions\\.ts$/"],
       "matchStrings": ["\\w+: '(?<depName>[a-z0-9./-]+):(?<currentValue>[^']+)',"],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "GitHub Actions in generated CI workflows",
+      "managerFilePatterns": ["/^src/core/versions\\.ts$/"],
+      "matchStrings": ["\\w+: '(?<depName>[\\w.-]+/[\\w.-]+)@(?<currentValue>v\\d+)',"],
+      "datasourceTemplate": "github-tags"
     }
   ]
 }

@@ -43,8 +43,10 @@ export async function create(parsedArgs: Record<string, unknown>, options: Creat
   const shownDir = relative(options.cwd, dir) || '.';
   p.log.success(`Created ${files.paths().length} files in ${pc.cyan(shownDir)}`);
 
+  // git init comes first so the install's `prepare` script can set up the git hooks.
+  const hasGit = cfg.git && (await gitInit(dir));
   if (cfg.install) await install(cfg, dir);
-  if (cfg.git) await gitInit(dir);
+  if (hasGit) await initialCommit(dir);
 
   const steps = [
     `cd ${shownDir}`,
@@ -70,17 +72,28 @@ async function install(cfg: ProjectConfig, dir: string) {
   }
 }
 
-async function gitInit(dir: string) {
+async function gitInit(dir: string): Promise<boolean> {
   if (!commandExists('git')) {
     p.log.warn("git isn't installed, so no repository was created.");
-    return;
+    return false;
   }
   await run('git', ['init', '--quiet'], dir);
+  return true;
+}
+
+async function initialCommit(dir: string) {
   await run('git', ['add', '--all'], dir);
   try {
+    // --no-verify: the generated files are already linted and formatted, so skip the hooks.
     await run(
       'git',
-      ['commit', '--quiet', '--message', 'Initial commit from create-prodforge'],
+      [
+        'commit',
+        '--quiet',
+        '--no-verify',
+        '--message',
+        'chore: initial commit from create-prodforge',
+      ],
       dir,
     );
     p.log.success('Initialized a git repository');

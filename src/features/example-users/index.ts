@@ -13,6 +13,15 @@ export const exampleUsers: Feature = {
   dependsOn: ['base'],
   async apply(ctx) {
     await ctx.files.copyDir(featureFiles('example-users'));
+    if (ctx.cfg.openapi) {
+      await ctx.files.copyDir(featureFiles('example-users', 'files-openapi'));
+      ctx.inject(
+        'src/openapi/document.ts',
+        'imports',
+        "import { usersPaths } from '../modules/users/users.openapi';",
+      );
+      ctx.inject('src/openapi/document.ts', 'paths', '...usersPaths,');
+    }
     ctx.inject(
       'README.md',
       'docs',
@@ -26,7 +35,7 @@ export const exampleUsers: Feature = {
         '- `POST /users`: create one from `{ "email", "name" }`',
         '- `GET /users/:id`, `PATCH /users/:id`, `DELETE /users/:id`',
         '',
-        'Copy it as a starting point for your own modules. To remove it, delete `src/modules/users`, `tests/users.test.ts` and the `usersRouter` lines in `src/app.ts`.',
+        'Copy it as a starting point for your own modules. To remove it, delete `src/modules/users`, `tests/users.test.ts` and the users lines in `src/app.ts`.',
       ].join('\n'),
     );
   },

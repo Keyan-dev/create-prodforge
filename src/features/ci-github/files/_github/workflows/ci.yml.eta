@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: <%= it.actions.checkout %>
+<% if (it.cfg.packageManager === 'pnpm') { -%>
+      # Installs the pnpm version named in package.json "packageManager".
+      - uses: <%= it.actions.pnpmSetup %>
+<% } -%>
+<% if (it.cfg.packageManager === 'bun') { -%>
+      - uses: <%= it.actions.setupBun %>
+<% } -%>
+      - uses: <%= it.actions.setupNode %>
+        with:
+          node-version-file: .nvmrc
+<% if (it.cache) { -%>
+          cache: <%= it.cache %>
+<% } -%>
+      - run: <%= it.install %>
+      - run: <%= it.run %> lint
+      - run: <%= it.run %> format:check
+      - run: <%= it.run %> typecheck
+      - run: <%= it.run %> test
+      - run: <%= it.run %> build
+  # @slot:jobs
