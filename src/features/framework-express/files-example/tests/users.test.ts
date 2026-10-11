@@ -1,48 +1,18 @@
-import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app';
-import {
-  EmailTakenError,
-  type User,
-  type UsersRepository,
-} from '../src/modules/users/users.schema';
+import { memoryUsersRepository } from './support/memory-users-repository';
 
-// The routes are tested against an in-memory repository, so these tests need no database.
-const users = new Map<string, User>();
-
-vi.mock('../src/modules/users/users.repository', () => {
-  const emailTaken = (email: string | undefined, id?: string) =>
-    [...users.values()].some((user) => user.email === email && user.id !== id);
-
-  const usersRepository: UsersRepository = {
-    list: async ({ limit, offset }) => [...users.values()].slice(offset, offset + limit),
-    findById: async (id) => users.get(id) ?? null,
-    create: async (data) => {
-      if (emailTaken(data.email)) throw new EmailTakenError();
-      const now = new Date();
-      const user = { id: randomUUID(), ...data, createdAt: now, updatedAt: now };
-      users.set(user.id, user);
-      return user;
-    },
-    update: async (id, data) => {
-      const user = users.get(id);
-      if (!user) return null;
-      if (emailTaken(data.email, id)) throw new EmailTakenError();
-      const updated = { ...user, ...data, updatedAt: new Date() };
-      users.set(id, updated);
-      return updated;
-    },
-    remove: async (id) => users.delete(id),
-  };
-  return { usersRepository };
-});
+// The routes run against an in-memory repository, so these tests need no database.
+vi.mock('../src/modules/users/users.repository', async () => ({
+  usersRepository: (await import('./support/memory-users-repository')).memoryUsersRepository,
+}));
 
 const app = createApp();
 const ada = { email: 'ada@example.com', name: 'Ada Lovelace' };
 
 describe('users', () => {
-  beforeEach(() => users.clear());
+  beforeEach(() => memoryUsersRepository.reset());
 
   it('creates, reads, updates and deletes a user', async () => {
     const created = await request(app).post('/users').send(ada);

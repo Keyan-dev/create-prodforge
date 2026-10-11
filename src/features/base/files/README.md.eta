@@ -19,8 +19,9 @@ The server starts on `http://localhost:3000`. Check it with `curl localhost:3000
 - `<%= run %> build`: bundle to `dist/` with tsdown
 - `<%= run %> start`: run the built server
 - `<%= run %> test`: run the tests once
-- `<%= run %> lint`: lint with ESLint
-- `<%= run %> format`: format with Prettier
+<% const biome = it.cfg.lint === 'biome'; -%>
+- `<%= run %> lint`: lint with <%= biome ? 'Biome' : 'ESLint' %>
+- `<%= run %> format`: format with <%= biome ? 'Biome' : 'Prettier' %>
 - `<%= run %> typecheck`: type-check without emitting
 
 ## Configuration

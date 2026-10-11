@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 import { parseConfig, type ProjectConfigInput } from '../../src/core/config';
 import { generate } from '../../src/core/pipeline';
 import { features } from '../../src/features';
@@ -77,12 +78,84 @@ describe('generated project', () => {
     expect(files['drizzle/meta/_journal.json']).toContain('"entries": []');
   });
 
+  // A framework owns the HTTP layer: app, server, middleware, routes and their tests.
+  const FRAMEWORK_FILES = /^(package\.json|\.env\.example|src\/(?!db\/)|tests\/(?!support\/))/;
+
+  it.each(['fastify', 'hono'] as const)('--framework %s', async (framework) => {
+    const { files, features: ran } = await snapshot({ name: 'my-api', framework });
+    expect(ran).toContain(`framework-${framework}`);
+    expect(ran).not.toContain('framework-express');
+    expect(
+      Object.fromEntries(Object.entries(files).filter(([path]) => FRAMEWORK_FILES.test(path))),
+    ).toMatchSnapshot();
+  });
+
+  it('--lint biome', async () => {
+    const { files, features: ran } = await snapshot({
+      name: 'my-api',
+      lint: 'biome',
+      db: 'drizzle',
+    });
+    expect(ran).toContain('lint-biome');
+    expect(ran).not.toContain('lint-eslint');
+    expect(Object.keys(files).filter((path) => /eslint|prettier/.test(path))).toEqual([]);
+    expect(files['biome.jsonc']).toMatchSnapshot();
+    expect(JSON.parse(files['package.json'] ?? '{}')).toMatchObject({
+      scripts: { lint: 'biome lint', format: 'biome format --write' },
+    });
+    expect(files['README.md']).toContain('lint with Biome');
+  });
+
+  it('git hooks follow the package manager and linter', async () => {
+    const { files } = await snapshot({ name: 'my-api', packageManager: 'npm', lint: 'biome' });
+    expect(files['.husky/pre-commit']).toBe('npx --no -- lint-staged\n');
+    expect(files['.husky/commit-msg']).toBe('npx --no -- commitlint --edit "$1"\n');
+    expect(JSON.parse(files['package.json'] ?? '{}')['lint-staged']).toEqual({
+      '*': 'biome check --write --no-errors-on-unmatched --files-ignore-unknown=true',
+    });
+  });
+
+  it.each(['pnpm', 'npm', 'bun'] as const)('CI workflow with %s', async (packageManager) => {
+    const { files } = await snapshot({ name: 'my-api', packageManager });
+    const workflow = files['.github/workflows/ci.yml'];
+    expect(parse(workflow ?? '')).toHaveProperty('jobs.check.steps');
+    expect(workflow).toMatchSnapshot();
+  });
+
+  it('without CI', async () => {
+    const { files } = await snapshot({ name: 'my-api', ci: false });
+    expect(Object.keys(files).filter((path) => path.startsWith('.github/'))).toEqual([]);
+  });
+
+  it('OpenAPI document with the users paths', async () => {
+    const { files, features: ran } = await snapshot({ name: 'my-api' });
+    expect(ran).toContain('openapi');
+    expect(files['src/openapi/document.ts']).toMatchSnapshot();
+    expect(files['src/openapi/docs-page.ts']).toMatch(/@scalar\/api-reference@\d+\.\d+\.\d+'/);
+    expect(files['src/app.ts']).toContain('app.use(docsRouter);');
+  });
+
+  it.each(['express', 'fastify', 'hono'] as const)('without OpenAPI (%s)', async (framework) => {
+    const { files } = await snapshot({ name: 'my-api', framework, openapi: false });
+    expect(Object.keys(files).filter((path) => /openapi|docs/.test(path))).toEqual([]);
+    expect(files['package.json']).not.toMatch(/zod-openapi|@scalar/);
+    expect(files['src/app.ts']).not.toMatch(/docs/i);
+  });
+
+  it('without git hooks', async () => {
+    const { files } = await snapshot({ name: 'my-api', gitHooks: false });
+    expect(Object.keys(files).filter((path) => /husky|commitlint/.test(path))).toEqual([]);
+    expect(files['package.json']).not.toMatch(/husky|lint-staged|"prepare"/);
+  });
+
   it.each(['prisma', 'drizzle', 'mongoose', 'none'] as const)(
     'leaves no slot markers behind (%s)',
     async (db) => {
-      const { files } = await snapshot({ name: 'my-api', db });
-      for (const [path, content] of Object.entries(files)) {
-        expect(content, path).not.toMatch(/@slot:/);
+      for (const framework of ['express', 'fastify', 'hono'] as const) {
+        const { files } = await snapshot({ name: 'my-api', db, framework });
+        for (const [path, content] of Object.entries(files)) {
+          expect(content, `${framework}: ${path}`).not.toMatch(/@slot:/);
+        }
       }
     },
   );

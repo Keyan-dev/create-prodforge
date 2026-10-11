@@ -2,7 +2,7 @@ import { stringify } from 'yaml';
 import type { ProjectConfig } from '../../core/config';
 import type { Feature } from '../../core/feature';
 import { featureFiles } from '../../core/templates';
-import { versions } from '../../core/versions';
+import { actions, versions } from '../../core/versions';
 
 /** Lockfile and commands per package manager, used by the Dockerfile template. */
 const PACKAGE_MANAGERS = {
@@ -55,6 +55,25 @@ export const docker: Feature = {
         '',
         'The image is a multi-stage build on `node:alpine` that runs as the non-root `node` user, with a `HEALTHCHECK` on `/health`. Commit your lockfile first: the build installs from it.',
       ].join('\n'),
+    );
+    // With the ci-github feature, CI also builds the image (without pushing it).
+    ctx.inject(
+      '.github/workflows/ci.yml',
+      'jobs',
+      [
+        'docker:',
+        '  runs-on: ubuntu-latest',
+        '  steps:',
+        `    - uses: ${actions.checkout}`,
+        `    - uses: ${actions.setupBuildx}`,
+        `    - uses: ${actions.buildPush}`,
+        '      with:',
+        '        context: .',
+        '        push: false',
+        '        cache-from: type=gha',
+        '        cache-to: type=gha,mode=max',
+      ].join('\n'),
+      { optional: true },
     );
   },
   finalize(ctx) {

@@ -13,6 +13,14 @@ function unwrap<T>(value: T): Exclude<T, symbol> {
   return value as Exclude<T, symbol>;
 }
 
+const EXTRAS = [
+  { value: 'openapi', label: 'OpenAPI docs', hint: '/openapi.json and a Scalar page at /docs' },
+  { value: 'docker', label: 'Docker', hint: 'Dockerfile and compose.yaml' },
+  { value: 'pm2', label: 'PM2', hint: 'cluster mode config' },
+  { value: 'ci', label: 'GitHub Actions CI' },
+  { value: 'gitHooks', label: 'Git hooks', hint: 'Husky, lint-staged, commitlint' },
+] as const satisfies { value: keyof ProjectConfigInput; label: string; hint?: string }[];
+
 /**
  * Ask for whatever the flags didn't settle. Only options that a feature implements today are
  * asked about; the rest keep their defaults (see availability.ts).
@@ -36,6 +44,19 @@ export async function promptForMissing(
       }),
     );
   }
+  if (answers.framework === undefined) {
+    answers.framework = unwrap(
+      await p.select({
+        message: 'Framework',
+        initialValue: 'express' as const,
+        options: [
+          { value: 'express', label: 'Express', hint: 'recommended' },
+          { value: 'fastify', label: 'Fastify' },
+          { value: 'hono', label: 'Hono' },
+        ],
+      }),
+    );
+  }
   if (answers.db === undefined) {
     answers.db = unwrap(
       await p.select({
@@ -50,6 +71,33 @@ export async function promptForMissing(
       }),
     );
   }
+  if (answers.lint === undefined) {
+    answers.lint = unwrap(
+      await p.select({
+        message: 'Linter and formatter',
+        initialValue: 'eslint' as const,
+        options: [
+          { value: 'eslint', label: 'ESLint + Prettier', hint: 'recommended' },
+          { value: 'biome', label: 'Biome' },
+        ],
+      }),
+    );
+  }
+
+  // Extras the flags didn't settle, all on by default.
+  const extras = EXTRAS.filter(({ value }) => answers[value] === undefined);
+  if (extras.length) {
+    const chosen = unwrap(
+      await p.multiselect({
+        message: 'Extras',
+        options: extras,
+        initialValues: extras.map(({ value }) => value),
+        required: false,
+      }),
+    );
+    for (const { value } of extras) answers[value] = chosen.includes(value);
+  }
+
   if (answers.install === undefined) {
     answers.install = unwrap(await p.confirm({ message: 'Install dependencies?' }));
   }

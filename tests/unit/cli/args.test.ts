@@ -40,25 +40,17 @@ describe('argsToConfig', () => {
 });
 
 describe('unavailable', () => {
-  it('blocks options without a feature and lists skipped add-ons', () => {
-    expect(unavailable(parseConfig({ name: 'x', framework: 'hono' })).blocking).toEqual([
-      'framework "hono"',
-    ]);
-    expect(unavailable(parseConfig({ name: 'x' })).skipped).toContain('OpenAPI');
+  it('lists add-ons it skips', () => {
+    expect(unavailable(parseConfig({ name: 'x', otel: true })).skipped).toContain('OpenTelemetry');
     expect(unavailable(parseConfig({ name: 'x', db: 'none', example: true })).skipped).toContain(
       'example module (it needs a database)',
     );
   });
 
   it('reports nothing for a config the current features fully cover', () => {
-    const cfg = parseConfig({
-      name: 'x',
-      openapi: false,
-      docker: false,
-      pm2: false,
-      ci: false,
-      gitHooks: false,
-    });
-    expect(unavailable(cfg)).toEqual({ blocking: [], skipped: [] });
+    for (const framework of ['express', 'fastify', 'hono'] as const) {
+      const cfg = parseConfig({ name: 'x', framework, lint: 'biome' });
+      expect(unavailable(cfg)).toEqual({ blocking: [], skipped: [] });
+    }
   });
 });
