@@ -85,17 +85,26 @@ async function waitForHealth(port: number, what: string) {
   });
 }
 
-async function json(port: number, path: string, init?: { method: string; body?: unknown }) {
+async function json(
+  port: number,
+  path: string,
+  init?: { method?: string; body?: unknown; headers?: Record<string, string> },
+) {
   // Content-Type only with a body: Fastify rejects an empty body declared as JSON.
   const response = await fetch(`http://localhost:${port}${path}`, {
     method: init?.method ?? 'GET',
-    ...(init?.body !== undefined && {
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(init.body),
-    }),
+    headers: {
+      ...(init?.body !== undefined && { 'content-type': 'application/json' }),
+      ...init?.headers,
+    },
+    ...(init?.body !== undefined && { body: JSON.stringify(init.body) }),
   });
   const text = await response.text();
-  return { status: response.status, body: text ? JSON.parse(text) : undefined };
+  return {
+    status: response.status,
+    headers: response.headers,
+    body: text ? JSON.parse(text) : undefined,
+  };
 }
 
 /** What the generated project contains, read from its files after generation. */
@@ -106,6 +115,7 @@ interface Project {
   migrations: boolean;
   usersApi: boolean;
   docs: boolean;
+  auth: 'jwt' | 'better-auth' | undefined;
   worker: boolean;
   hooks: boolean;
   docker: boolean;
@@ -128,6 +138,7 @@ async function inspect(dir: string): Promise<Project> {
     migrations: 'db:deploy' in pkg.scripts,
     usersApi: has('src/modules/users'),
     docs: has('src/openapi'),
+    auth: has('src/lib/jwt.ts') ? 'jwt' : has('src/lib/auth.ts') ? 'better-auth' : undefined,
     worker: has('src/worker.ts'),
     hooks: has('.husky'),
     docker: has('Dockerfile'),
@@ -152,6 +163,57 @@ async function expectUsersApi(port: number) {
   expect((await json(port, `/users/${id}`)).status).toBe(404);
 }
 
+/** Register, log in, call a protected route and refresh with the JWT routes. */
+async function expectJwtAuth(port: number) {
+  const credentials = { email: `grace-${Date.now()}@example.com`, password: 'correct-horse' };
+  expect((await json(port, '/auth/register', { method: 'POST', body: credentials })).status).toBe(
+    201,
+  );
+  const duplicate = await json(port, '/auth/register', { method: 'POST', body: credentials });
+  expect(duplicate.status).toBe(409);
+  const login = await json(port, '/auth/login', { method: 'POST', body: credentials });
+  expect(login.status).toBe(200);
+  const { accessToken, refreshToken } = login.body as { accessToken: string; refreshToken: string };
+
+  const me = await json(port, '/auth/me', { headers: { authorization: `Bearer ${accessToken}` } });
+  expect(me).toMatchObject({ status: 200, body: { email: credentials.email } });
+  expect((await json(port, '/auth/me')).status).toBe(401);
+  const refreshed = await json(port, '/auth/refresh', { method: 'POST', body: { refreshToken } });
+  expect(refreshed.status).toBe(200);
+}
+
+/** Sign up and in with Better Auth, then call a protected route with the cookie and the token. */
+async function expectBetterAuth(port: number) {
+  const credentials = { email: `grace-${Date.now()}@example.com`, password: 'correct-horse' };
+  // fetch sends Sec-Fetch-Mode like a browser, so in production Better Auth wants a trusted
+  // Origin. BETTER_AUTH_URL in .env.example is http://localhost:3000.
+  const headers = { origin: 'http://localhost:3000' };
+  const signUp = await json(port, '/api/auth/sign-up/email', {
+    method: 'POST',
+    body: { ...credentials, name: 'Grace' },
+    headers,
+  });
+  expect(signUp.status).toBe(200);
+  const signIn = await json(port, '/api/auth/sign-in/email', {
+    method: 'POST',
+    body: credentials,
+    headers,
+  });
+  expect(signIn.status).toBe(200);
+  const cookie = signIn.headers
+    .getSetCookie()
+    .map((value) => value.split(';')[0])
+    .join('; ');
+  const token = signIn.headers.get('set-auth-token');
+  expect(token).toBeTruthy();
+
+  const withCookie = await json(port, '/auth/me', { headers: { cookie } });
+  expect(withCookie).toMatchObject({ status: 200, body: { email: credentials.email } });
+  const withToken = await json(port, '/auth/me', { headers: { authorization: `Bearer ${token}` } });
+  expect(withToken.status).toBe(200);
+  expect((await json(port, '/auth/me')).status).toBe(401);
+}
+
 /** /openapi.json describes the API (users paths included with the example); /docs serves HTML. */
 async function expectApiDocs(port: number, withUsers: boolean) {
   const document = await json(port, '/openapi.json');
@@ -164,7 +226,7 @@ async function expectApiDocs(port: number, withUsers: boolean) {
   expect(docs.headers.get('content-type')).toMatch(/^text\/html/);
 }
 
-/** Every check the running app should pass: readiness of each service, docs, the users API. */
+/** Every check the running app should pass: readiness of each service, docs, users API, auth. */
 async function expectRunningApp(port: number, project: Project) {
   const ready = await json(port, '/ready');
   expect(ready.status).toBe(200);
@@ -172,6 +234,8 @@ async function expectRunningApp(port: number, project: Project) {
   for (const status of Object.values(ready.body.checks)) expect(status).toBe('ok');
   if (project.docs) await expectApiDocs(port, project.usersApi);
   if (project.usersApi) await expectUsersApi(port);
+  if (project.auth === 'jwt') await expectJwtAuth(port);
+  if (project.auth === 'better-auth') await expectBetterAuth(port);
 }
 
 describe.each(cases)('create-prodforge my-api --yes $flags', ({ flags }) => {

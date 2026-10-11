@@ -39,6 +39,7 @@ export function createApp() {
       legacyHeaders: false,
     }),
   );
+  // @slot:before-body
   app.use(express.json({ limit: env.BODY_LIMIT_KB * 1024 }));
   // @slot:middleware
 

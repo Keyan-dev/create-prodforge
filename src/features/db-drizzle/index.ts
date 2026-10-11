@@ -1,17 +1,40 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import type { GeneratorContext } from '../../core/context';
 import type { Feature } from '../../core/feature';
 import { featureFiles } from '../../core/templates';
 import { pick } from '../../core/versions';
 import { connectOnStartup, readmeSetup, runScript, usePostgres } from '../shared/database';
 
-/**
- * drizzle-kit's migration journal. `drizzle-kit migrate` fails without one, so a project
- * without the example still gets an empty journal; the example lists its users migration.
- */
-function journal(example: boolean) {
-  const entries = example
-    ? [{ idx: 0, version: '7', when: 1791661440873, tag: '0000_init', breakpoints: true }]
-    : [];
+interface JournalEntry {
+  idx: number;
+  version: '7';
+  when: number;
+  tag: string;
+  breakpoints: true;
+}
+
+/** drizzle-kit's migration journal. `drizzle-kit migrate` fails without one, even if empty. */
+function journal(entries: JournalEntry[]) {
   return `${JSON.stringify({ version: '7', dialect: 'postgresql', entries }, null, 2)}\n`;
+}
+
+/**
+ * The auth tables' migration, numbered after the users migration when the example is on. Each
+ * auth option ships its SQL and the drizzle-kit snapshot for both positions (the snapshot
+ * includes every table so far and points at the previous one), so later `db:generate` runs diff
+ * against the right state.
+ */
+async function writeAuthMigration(ctx: GeneratorContext, auth: string, idx: number) {
+  const dir = featureFiles('db-drizzle', `files-auth-${auth}-migration`);
+  const tag = `${String(idx).padStart(4, '0')}_auth`;
+  const snapshot = idx === 0 ? 'snapshot-alone.json' : 'snapshot-after-users.json';
+  ctx.files.write(`drizzle/${tag}.sql`, await readFile(join(dir, 'auth.sql'), 'utf8'));
+  ctx.files.write(
+    `drizzle/meta/${tag.slice(0, 4)}_snapshot.json`,
+    await readFile(join(dir, snapshot), 'utf8'),
+  );
+  return { idx, version: '7', when: 1791703413409, tag, breakpoints: true } as const;
 }
 
 /**
@@ -40,9 +63,23 @@ export const dbDrizzle: Feature = {
     ctx.compose.setMigrateScript('db:deploy');
 
     await ctx.files.copyDir(featureFiles('db-drizzle'), '.', { example: cfg.example });
-    if (cfg.example) await ctx.files.copyDir(featureFiles('db-drizzle', 'files-example'));
+    const entries: JournalEntry[] = [];
+    if (cfg.example) {
+      await ctx.files.copyDir(featureFiles('db-drizzle', 'files-example'));
+      entries.push({
+        idx: 0,
+        version: '7',
+        when: 1791661440873,
+        tag: '0000_init',
+        breakpoints: true,
+      });
+    }
+    if (cfg.auth !== 'none') {
+      await ctx.files.copyDir(featureFiles('db-drizzle', `files-auth-${cfg.auth}`));
+      entries.push(await writeAuthMigration(ctx, cfg.auth, entries.length));
+    }
     // Written here rather than copied: a template named `_journal.json` would become a dotfile.
-    ctx.files.write('drizzle/meta/_journal.json', journal(cfg.example));
+    ctx.files.write('drizzle/meta/_journal.json', journal(entries));
 
     // drizzle-kit writes its snapshots as tab-indented JSON; leave generated files alone.
     ctx.inject('.prettierignore', 'ignore', 'drizzle/', { optional: true });

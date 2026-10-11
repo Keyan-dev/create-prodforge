@@ -176,6 +176,37 @@ describe('generated project', () => {
     expect(files['src/instrumentation.ts']).toMatchSnapshot();
   });
 
+  // Auth files come from three places: the auth feature (service, tokens), the database (storage)
+  // and the framework (routes, tests). Snapshot what each adds.
+  const AUTH_FILES =
+    /auth|password|jwt|schema\.(prisma|ts)$|drizzle\/|migrations\/|src\/app\.ts|\.env/;
+
+  it.each([
+    ['jwt', 'prisma', 'express'],
+    ['jwt', 'drizzle', 'fastify'],
+    ['jwt', 'mongoose', 'hono'],
+    ['better-auth', 'prisma', 'fastify'],
+    ['better-auth', 'drizzle', 'hono'],
+    ['better-auth', 'mongoose', 'express'],
+  ] as const)('--auth %s with %s and %s', async (auth, db, framework) => {
+    const { files, features: ran } = await snapshot({ name: 'my-api', auth, db, framework });
+    expect(ran).toContain(auth === 'jwt' ? 'auth-jwt' : 'auth-better-auth');
+    expect(
+      Object.fromEntries(Object.entries(files).filter(([path]) => AUTH_FILES.test(path))),
+    ).toMatchSnapshot();
+    expect(files['package.json']).toContain(auth === 'jwt' ? '"jose"' : '"better-auth"');
+  });
+
+  it('--auth jwt documents its routes in OpenAPI', async () => {
+    const { files } = await snapshot({ name: 'my-api', auth: 'jwt' });
+    expect(files['src/openapi/document.ts']).toMatchSnapshot();
+  });
+
+  it('--auth needs a database', async () => {
+    const { features: ran } = await snapshot({ name: 'my-api', auth: 'jwt', db: 'none' });
+    expect(ran).not.toContain('auth-jwt');
+  });
+
   it('without git hooks', async () => {
     const { files } = await snapshot({ name: 'my-api', gitHooks: false });
     expect(Object.keys(files).filter((path) => /husky|commitlint/.test(path))).toEqual([]);

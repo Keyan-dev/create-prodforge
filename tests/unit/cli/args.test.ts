@@ -41,7 +41,9 @@ describe('argsToConfig', () => {
 
 describe('unavailable', () => {
   it('lists add-ons it skips', () => {
-    expect(unavailable(parseConfig({ name: 'x', auth: 'jwt' })).skipped).toContain('auth (jwt)');
+    expect(unavailable(parseConfig({ name: 'x', auth: 'jwt', db: 'none' })).skipped).toContain(
+      'auth (it needs a database)',
+    );
     expect(unavailable(parseConfig({ name: 'x', db: 'none', example: true })).skipped).toContain(
       'example module (it needs a database)',
     );

@@ -1,6 +1,7 @@
 import type { Feature } from '../../core/feature';
 import { featureFiles } from '../../core/templates';
 import { pick } from '../../core/versions';
+import { hasAuth } from '../shared/auth';
 import { addHttpEnv, hasUsersExample } from '../shared/http';
 
 /**
@@ -32,6 +33,33 @@ export const frameworkExpress: Feature = {
         "import { docsRouter } from './modules/docs/docs.routes';",
       );
       ctx.inject('src/app.ts', 'routes', 'app.use(docsRouter);');
+    }
+
+    // Auth routes and tests (see the auth-jwt feature).
+    if (hasAuth(ctx, 'jwt')) {
+      await ctx.files.copyDir(featureFiles('framework-express', 'files-auth-jwt'));
+      ctx.inject(
+        'src/app.ts',
+        'imports',
+        "import { authRouter } from './modules/auth/auth.routes';",
+      );
+      ctx.inject('src/app.ts', 'routes', "app.use('/auth', authRouter);");
+    }
+
+    // Better Auth's handler, an example protected route and tests (see auth-better-auth).
+    if (hasAuth(ctx, 'better-auth')) {
+      await ctx.files.copyDir(featureFiles('framework-express', 'files-auth-better-auth'));
+      ctx.inject(
+        'src/app.ts',
+        'imports',
+        "import { toNodeHandler } from 'better-auth/node';\nimport { auth } from './lib/auth';\nimport { authRouter } from './modules/auth/auth.routes';",
+      );
+      ctx.inject(
+        'src/app.ts',
+        'before-body',
+        "// Better Auth reads the raw body, so it goes before the JSON parser.\napp.all('/api/auth/{*splat}', toNodeHandler(auth));",
+      );
+      ctx.inject('src/app.ts', 'routes', "app.use('/auth', authRouter);");
     }
 
     // Routes and tests for the example users module (see the example-users feature).

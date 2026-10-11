@@ -52,6 +52,11 @@ jobs:
           - { framework: express, db: prisma, lint: eslint, extra: '--cache bullmq --otel' }
           - { framework: fastify, db: mongoose, lint: eslint, extra: '--cache redis --otel' }
           - { framework: hono, db: drizzle, lint: biome, extra: '--cache bullmq' }
+          - { framework: express, db: prisma, lint: eslint, extra: '--auth jwt' }
+          - { framework: hono, db: mongoose, lint: eslint, extra: '--auth jwt' }
+          - { framework: fastify, db: drizzle, lint: eslint, extra: '--auth better-auth' }
+          - { framework: express, db: mongoose, lint: biome, extra: '--auth better-auth' }
+          - { framework: hono, db: prisma, lint: eslint, extra: '--auth better-auth' }
     env:
       PRODFORGE_E2E_FRAMEWORK: ${{ matrix.framework }}
       PRODFORGE_E2E_DB: ${{ matrix.db }}

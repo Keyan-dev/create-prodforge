@@ -37,4 +37,5 @@ export const openApiDocument = createDocument({
     },
     // @slot:paths
   },
+  // @slot:document
 });
