@@ -28,11 +28,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      - name: Smoke test the built CLI
-        run: |
-          test "$(node dist/index.js --version)" = "$(node -p 'require("./package.json").version')"
-          cd "$RUNNER_TEMP" && node "$GITHUB_WORKSPACE/dist/index.js" smoke-app --yes --no-install --no-git
-          test -f smoke-app/src/app.ts && test -f smoke-app/.gitignore
+      - name: Smoke test the packed CLI
+        run: scripts/smoke-pack.sh
 
   e2e:
     # Generate → install → lint/test/build/run for real (PLAN.md §6): every framework × database
