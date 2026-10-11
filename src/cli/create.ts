@@ -3,18 +3,28 @@ import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import { parseConfig, type ProjectConfig, type ProjectConfigInput } from '../core/config';
 import { generate, writeProject } from '../core/pipeline';
+import { loadPreset } from '../core/presets';
+import type { VirtualFS } from '../core/vfs';
 import { features } from '../features';
 import { commandExists, run } from '../utils/exec';
+import { useLatestVersions, type LatestVersion } from '../utils/latest';
 import { detectPackageManager, runCommand } from '../utils/pm';
 import { argsToConfig } from './args';
 import { unavailable } from './availability';
 import { promptForMissing } from './prompts';
+import { formatTree } from './tree';
 
 export interface CreateOptions {
   cwd: string;
   /** Ask for missing answers. Off with `--yes` or when stdin isn't a terminal. */
   interactive: boolean;
   force: boolean;
+  /** Print what would be generated instead of writing it. */
+  dryRun?: boolean;
+  /** Resolve dependency versions from npm instead of versions.ts. */
+  latest?: boolean;
+  /** Looks up npm's latest version of a package (replaced in tests). */
+  latestVersion?: LatestVersion;
 }
 
 /** Resolve the config from flags (and prompts), generate the project, then install and git init. */
@@ -22,6 +32,9 @@ export async function create(parsedArgs: Record<string, unknown>, options: Creat
   p.intro(pc.bold('create-prodforge'));
 
   let input = argsToConfig(parsedArgs);
+  if (typeof parsedArgs.preset === 'string') {
+    input = { ...(await loadPreset(parsedArgs.preset, options.cwd)), ...input };
+  }
   input.packageManager ??= detectPackageManager(process.env.npm_config_user_agent, () =>
     commandExists('pnpm'),
   );
@@ -39,6 +52,15 @@ export async function create(parsedArgs: Record<string, unknown>, options: Creat
   // A scoped name like @acme/api goes in ./api.
   const dir = resolve(options.cwd, basename(cfg.name));
   const { files } = await generate(cfg, features);
+  if (options.latest) await applyLatest(files, options.latestVersion);
+
+  if (options.dryRun) {
+    p.note(formatTree(files.paths()), `${files.paths().length} files in ${basename(dir)}/`);
+    p.note(files.read('package.json').trimEnd(), 'package.json');
+    p.outro('Dry run: nothing was written.');
+    return;
+  }
+
   await writeProject(files, dir, { force: options.force });
   const shownDir = relative(options.cwd, dir) || '.';
   p.log.success(`Created ${files.paths().length} files in ${pc.cyan(shownDir)}`);
@@ -54,6 +76,28 @@ export async function create(parsedArgs: Record<string, unknown>, options: Creat
     runCommand(cfg.packageManager, 'dev'),
   ].filter(Boolean);
   p.outro(`Done! Next:\n   ${steps.join('\n   ')}`);
+}
+
+async function applyLatest(files: VirtualFS, latestVersion?: LatestVersion) {
+  p.log.warn(
+    '--latest: dependencies use the newest npm releases, which this version of create-prodforge has not tested together. Drop the flag for the verified versions.',
+  );
+  const spinner = p.spinner();
+  spinner.start('Looking up the latest versions on npm');
+  const { content, updated, failed } = await useLatestVersions(
+    files.read('package.json'),
+    latestVersion,
+  );
+  files.write('package.json', content);
+  spinner.stop(`Updated ${updated.length} dependencies to their latest versions`);
+  for (const { name, from, to } of updated) p.log.message(`${name} ${from} → ${to}`);
+  if (failed.length) {
+    p.log.warn(
+      `Kept the pinned versions of packages npm couldn't answer for: ${failed
+        .map(({ name, reason }) => `${name} (${reason})`)
+        .join(', ')}`,
+    );
+  }
 }
 
 async function install(cfg: ProjectConfig, dir: string) {

@@ -19,6 +19,8 @@ export const main = defineCommand({
         cwd: process.cwd(),
         interactive: !parsed.yes && Boolean(process.stdin.isTTY),
         force: Boolean(parsed.force),
+        dryRun: Boolean(parsed['dry-run']),
+        latest: Boolean(parsed.latest),
       });
     } catch (error) {
       if (error instanceof CancelledError) {

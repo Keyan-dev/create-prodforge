@@ -57,6 +57,8 @@ jobs:
           - { framework: fastify, db: drizzle, lint: eslint, extra: '--auth better-auth' }
           - { framework: express, db: mongoose, lint: biome, extra: '--auth better-auth' }
           - { framework: hono, db: prisma, lint: eslint, extra: '--auth better-auth' }
+          - { framework: express, db: prisma, lint: eslint, extra: '--preset full' }
+          - { framework: express, db: none, lint: eslint, extra: '--preset minimal' }
     env:
       PRODFORGE_E2E_FRAMEWORK: ${{ matrix.framework }}
       PRODFORGE_E2E_DB: ${{ matrix.db }}
