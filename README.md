@@ -89,6 +89,16 @@ Teams can keep their own preset in a JSON file. It takes any option except the p
 npm create prodforge@latest my-api -- --preset ./team-preset.json
 ```
 
+## Adding options later
+
+Every project records its options in `.prodforge.json`. Run `add` in the project to turn more on:
+
+```bash
+npx create-prodforge@latest add bullmq jwt otel
+```
+
+Add-ons: `redis`, `bullmq`, `jwt`, `better-auth`, `otel`, `openapi`, `docker`, `pm2`, `ci`, `git-hooks`, `example`. It creates the new files, replaces the ones you haven't touched, and merges the ones you have: `package.json` key by key, other files with `git merge-file`, leaving conflict markers where you and the generator changed the same lines. New variables are appended to your `.env`. Use `--dry-run` to see the changes first, and commit before you run it so you can review the diff.
+
 ## What's in a generated project
 
 ```

@@ -2,6 +2,7 @@ import { basename, relative, resolve } from 'node:path';
 import * as p from '@clack/prompts';
 import pc from 'picocolors';
 import { parseConfig, type ProjectConfig, type ProjectConfigInput } from '../core/config';
+import { MANIFEST_FILE, manifestFor } from '../core/manifest';
 import { generate, writeProject } from '../core/pipeline';
 import { loadPreset } from '../core/presets';
 import type { VirtualFS } from '../core/vfs';
@@ -19,6 +20,8 @@ export interface CreateOptions {
   /** Ask for missing answers. Off with `--yes` or when stdin isn't a terminal. */
   interactive: boolean;
   force: boolean;
+  /** create-prodforge's version, recorded in the project's manifest. */
+  version?: string;
   /** Print what would be generated instead of writing it. */
   dryRun?: boolean;
   /** Resolve dependency versions from npm instead of versions.ts. */
@@ -52,6 +55,8 @@ export async function create(parsedArgs: Record<string, unknown>, options: Creat
   // A scoped name like @acme/api goes in ./api.
   const dir = resolve(options.cwd, basename(cfg.name));
   const { files } = await generate(cfg, features);
+  // Records the options so `create-prodforge add` can re-run the generator later.
+  files.write(MANIFEST_FILE, manifestFor(cfg, options.version ?? '0.0.0'));
   if (options.latest) await applyLatest(files, options.latestVersion);
 
   if (options.dryRun) {

@@ -20,7 +20,9 @@ import { versions } from '../../src/core/versions.js';
  *
  * PRODFORGE_E2E_FRAMEWORK, PRODFORGE_E2E_DB and PRODFORGE_E2E_LINT pick the cases
  * (comma-separated; default every framework and database, with ESLint). PRODFORGE_E2E_FLAGS adds
- * CLI flags to every case (e.g. "--cache bullmq --otel"). CI runs one case per job.
+ * CLI flags to every case (e.g. "--cache bullmq --otel"), and PRODFORGE_E2E_ADD runs
+ * `create-prodforge add` with those add-ons right after generating (e.g. "bullmq jwt"), so the
+ * checks run on an upgraded project. CI runs one case per job.
  * PRODFORGE_E2E_SKIP_DOCKER=1 skips everything that needs a Docker daemon, which for projects
  * with a database or Redis includes running the app.
  */
@@ -38,6 +40,7 @@ function pick<T extends string>(name: string, all: readonly T[], fallback: reado
 }
 
 const extraFlags = process.env.PRODFORGE_E2E_FLAGS?.split(' ').filter(Boolean) ?? [];
+const addons = process.env.PRODFORGE_E2E_ADD?.split(' ').filter(Boolean) ?? [];
 const cases = pick('PRODFORGE_E2E_FRAMEWORK', FRAMEWORKS, FRAMEWORKS).flatMap((framework) =>
   pick('PRODFORGE_E2E_DB', DBS, DBS).flatMap((db) =>
     pick('PRODFORGE_E2E_LINT', LINTERS, ['eslint']).map((lint) => ({
@@ -254,7 +257,17 @@ describe.each(cases)('create-prodforge my-api --yes $flags', ({ flags }) => {
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'prodforge-e2e-'));
     await sh('node', [cli, 'my-api', '--yes', '--pm', 'pnpm', ...flags], root);
-    project = await inspect(join(root, 'my-api'));
+    const dir = join(root, 'my-api');
+    if (addons.length) {
+      await sh('node', [cli, 'add', ...addons], dir);
+      await sh('git', ['add', '--all'], dir);
+      await sh(
+        'git',
+        ['commit', '--quiet', '--no-verify', '-m', `feat: add ${addons.join(' ')}`],
+        dir,
+      );
+    }
+    project = await inspect(dir);
   });
 
   afterAll(async () => {

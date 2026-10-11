@@ -142,3 +142,13 @@ These pick the ★ defaults that `--yes` and `--preset api` use. PLAN.md §2 alr
 - **Provenance is set in the workflow (`NPM_CONFIG_PROVENANCE`), not `publishConfig`**, because provenance only works from CI and would break a local `npm publish`.
 - **The packed tarball is smoke-tested on every PR** (`scripts/smoke-pack.sh`): it checks the package has `dist/` and no sources, installs it in an empty directory and generates all three presets with it. It replaced the CI step that ran `dist/` from the repo, which couldn't catch files missing from `files`.
 - **The README demo GIF is drawn by `scripts/demo-gif.py`** (Pillow frames, then ffmpeg) from a script of the real prompts, so it can be redrawn when the prompts change without a screen recorder. *Tradeoff:* it's a re-enactment, so the answers and file count in the script must be kept in step with the CLI.
+
+## 2026-10-11 · Phase 8 `create-prodforge add`
+
+- **It's a subcommand of the same package** (`npx create-prodforge add bullmq`), not a second `prodforge` package, so there's one thing to install and version. The cost: a new project can't be named `add`.
+- **Generated projects record their options in `.prodforge.json`** (the config minus install/git, and the CLI version). It's written by the CLI, not a feature, so snapshot tests don't change on every version bump.
+- **Adding re-runs the generator twice in memory** (recorded options, then with the add-ons) and applies the difference to disk as a three-way merge, with the first run as the base. Features stay unchanged: they still only write to the virtual FS. New files are created; a file you haven't changed is replaced; `package.json` is merged key by key (yours wins on a clash, which is reported); other files go through `git merge-file`, which leaves standard conflict markers. Without git, the new version is written next to yours as `<file>.prodforge-new`. A generated file you deleted stays deleted.
+- **New env variables are appended to `.env`** with their `.env.example` values, so the app starts after an `add` without editing config by hand.
+- **Only additive options can be added.** Switching framework, database, linter or auth kind would mean rewriting code you've built on, so `add` refuses those. Adding `redis` to a BullMQ project is a no-op.
+- **The install after `add` unfreezes the lockfile** (`--no-frozen-lockfile` for pnpm), since CI-mode installs refuse an out-of-date lockfile by default.
+- **e2e upgrades a generated project** when `PRODFORGE_E2E_ADD` is set, then runs every check on the result; CI has two such cases.
