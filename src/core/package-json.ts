@@ -64,6 +64,22 @@ export class PackageJsonBuilder {
     return this.#merge(this.#scripts, scripts, 'script');
   }
 
+  /** The scripts added so far, by name. */
+  scripts(): Readonly<Record<string, string>> {
+    return { ...this.#scripts };
+  }
+
+  /**
+   * Deliberately rewrite an existing script, e.g. to add a Node flag to every script that runs
+   * the server. Throws if there is no such script, so a typo doesn't silently add a new one.
+   */
+  updateScript(name: string, update: (script: string) => string): this {
+    const existing = this.#scripts[name];
+    if (existing === undefined) throw new Error(`No script "${name}" to update`);
+    this.#scripts[name] = update(existing);
+    return this;
+  }
+
   /**
    * Let these dependencies run their install scripts. pnpm 10 skips them unless they are listed
    * in `pnpm.onlyBuiltDependencies`, so only call this for pnpm projects.

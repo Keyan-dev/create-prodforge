@@ -11,11 +11,15 @@ export const versions = {
   '@fastify/helmet': '13.1.2',
   '@fastify/rate-limit': '11.2.1',
   '@hono/node-server': '2.1.4',
+  '@opentelemetry/auto-instrumentations-node': '0.81.0',
+  '@opentelemetry/instrumentation': '0.223.0',
+  '@opentelemetry/sdk-node': '0.223.0',
   '@prisma/adapter-pg': '7.10.0',
   '@prisma/client': '7.10.0',
   '@scalar/express-api-reference': '0.10.28',
   '@scalar/fastify-api-reference': '1.73.1',
   '@scalar/hono-api-reference': '0.12.11',
+  'bullmq': '6.3.12',
   'cors': '2.8.6',
   'drizzle-orm': '0.45.4',
   'express': '5.3.0',
@@ -24,6 +28,7 @@ export const versions = {
   'helmet': '8.3.0',
   'hono': '4.13.13',
   'hono-rate-limiter': '0.5.4',
+  'ioredis': '6.0.0',
   'mongoose': '9.11.1',
   'pg': '8.23.1',
   'pino': '10.4.0',
@@ -75,6 +80,7 @@ export const versions = {
 export const images = {
   mongo: 'mongo:8',
   postgres: 'postgres:18-alpine',
+  redis: 'redis:8-alpine',
 } as const;
 
 /**

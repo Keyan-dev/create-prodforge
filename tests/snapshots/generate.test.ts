@@ -142,6 +142,40 @@ describe('generated project', () => {
     expect(files['src/app.ts']).not.toMatch(/docs/i);
   });
 
+  it('--cache bullmq adds Redis, a worker and its compose service', async () => {
+    const { files, features: ran } = await snapshot({ name: 'my-api', cache: 'bullmq' });
+    expect(ran).toEqual(expect.arrayContaining(['cache-redis', 'queue-bullmq']));
+    expect(files['src/lib/redis.ts']).toBeDefined();
+    expect(files['src/worker.ts']).toMatchSnapshot();
+    expect(files['src/server.ts']).toMatchSnapshot();
+    expect(files['compose.yaml']).toMatchSnapshot();
+    expect(files['ecosystem.config.cjs']).toMatchSnapshot();
+    expect(files['tsdown.config.ts']).toContain("'src/worker.ts',");
+  });
+
+  it('--cache redis has no worker', async () => {
+    const { files, features: ran } = await snapshot({ name: 'my-api', cache: 'redis' });
+    expect(ran).toContain('cache-redis');
+    expect(ran).not.toContain('queue-bullmq');
+    expect(files['src/worker.ts']).toBeUndefined();
+    expect(files['.env.example']).toContain('REDIS_URL=redis://localhost:6379');
+  });
+
+  it('--otel loads the instrumentation in every start script', async () => {
+    const { files } = await snapshot({ name: 'my-api', otel: true, cache: 'bullmq' });
+    const { scripts } = JSON.parse(files['package.json'] ?? '{}') as {
+      scripts: Record<string, string>;
+    };
+    for (const name of ['dev', 'start', 'dev:worker', 'start:worker']) {
+      expect(scripts[name], name).toMatch(/--import \.\/(src|dist)\/instrumentation\.(ts|js)/);
+    }
+    expect(files['Dockerfile']).toContain('ENV NODE_OPTIONS="--import ./dist/instrumentation.js"');
+    expect(files['ecosystem.config.cjs']).toContain(
+      "NODE_OPTIONS: '--import ./dist/instrumentation.js',",
+    );
+    expect(files['src/instrumentation.ts']).toMatchSnapshot();
+  });
+
   it('without git hooks', async () => {
     const { files } = await snapshot({ name: 'my-api', gitHooks: false });
     expect(Object.keys(files).filter((path) => /husky|commitlint/.test(path))).toEqual([]);

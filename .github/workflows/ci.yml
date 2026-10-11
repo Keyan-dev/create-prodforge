@@ -36,8 +36,8 @@ jobs:
 
   e2e:
     # Generate → install → lint/test/build/run for real (PLAN.md §6): every framework × database
-    # with ESLint, plus Biome on a couple of them. One job per case.
-    name: e2e (${{ matrix.framework }}, ${{ matrix.db }}, ${{ matrix.lint }})
+    # with ESLint, plus Biome and the add-ons (extra flags) on a few of them. One job per case.
+    name: e2e (${{ matrix.framework }}, ${{ matrix.db }}, ${{ matrix.lint }}${{ matrix.extra && format(', {0}', matrix.extra) || '' }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -45,13 +45,18 @@ jobs:
         framework: [express, fastify, hono]
         db: [prisma, drizzle, mongoose, none]
         lint: [eslint]
+        extra: ['']
         include:
-          - { framework: express, db: mongoose, lint: biome }
-          - { framework: hono, db: drizzle, lint: biome }
+          - { framework: express, db: mongoose, lint: biome, extra: '' }
+          - { framework: hono, db: drizzle, lint: biome, extra: '' }
+          - { framework: express, db: prisma, lint: eslint, extra: '--cache bullmq --otel' }
+          - { framework: fastify, db: mongoose, lint: eslint, extra: '--cache redis --otel' }
+          - { framework: hono, db: drizzle, lint: biome, extra: '--cache bullmq' }
     env:
       PRODFORGE_E2E_FRAMEWORK: ${{ matrix.framework }}
       PRODFORGE_E2E_DB: ${{ matrix.db }}
       PRODFORGE_E2E_LINT: ${{ matrix.lint }}
+      PRODFORGE_E2E_FLAGS: ${{ matrix.extra }}
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4

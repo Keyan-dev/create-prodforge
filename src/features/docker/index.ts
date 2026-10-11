@@ -108,6 +108,20 @@ export const docker: Feature = {
       app.depends_on = healthy;
     }
 
+    // Workers and other processes run the same image with the same environment and dependencies.
+    for (const [name, command] of Object.entries(ctx.compose.appProcesses())) {
+      extra[name] = {
+        build: '.',
+        command,
+        env_file: app.env_file,
+        environment: app.environment,
+        ...(app.depends_on !== undefined && { depends_on: app.depends_on }),
+        restart: 'unless-stopped',
+        // The image's HEALTHCHECK calls the HTTP server, which only the app runs.
+        healthcheck: { disable: true },
+      };
+    }
+
     const volumes = ctx.compose.volumes();
     const compose: Record<string, unknown> = { services: { app, ...extra, ...services } };
     if (volumes.length) compose.volumes = Object.fromEntries(volumes.map((name) => [name, {}]));
