@@ -242,7 +242,7 @@ Each phase is one or two AI sessions. **Done when** describes the acceptance che
 - [x] Phase 4 — Databases
 - [x] Phase 5 — More frameworks and options
 - [x] Phase 6 — Advanced options
-- [ ] Phase 7 — Polish and release (everything but the npm publish is done; it's ticked once `npm create prodforge@latest` works from the registry)
+- [x] Phase 7 — Polish and release (`create-prodforge@0.1.0` published to npm on 2026-10-14)
 - [x] Phase 8 — `create-prodforge add <feature>`
 
 ---
@@ -255,6 +255,6 @@ Each phase is one or two AI sessions. **Done when** describes the acceptance che
 - Plugin API so the community can publish `prodforge-feature-*` packages
 
 ## 10. Open questions
-- Final package name (`create-prodforge` is available on npm as of 2026-10-10)
+- ~~Final package name~~ Settled: published as `create-prodforge` (0.1.0, 2026-10-14).
 - ~~Should the generated project include an example CRUD module by default, or keep it opt-in?~~ Settled: on when a DB is selected (see `docs/decisions.md`).
 - ~~Distroless vs alpine as the default Docker base image~~ Settled: `node:24-alpine` (see `docs/decisions.md`).
